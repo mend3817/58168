@@ -1,0 +1,3020 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Sen</title>
+<!-- 引入萬能極速 WebSocket 庫 ( MQTT over WSS ) -->
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  /* 🏆 主題一：暖奢金屬風 (預設) */
+  :root {
+    --bg-main: #12161F;
+    --card-bg: #1A212D;
+    --border-color: #2D3A4E;
+    --accent-yellow: #E2B85C; /* 柔和琥珀金 */
+    --accent-green: #38D9A9;  /* 柔和薄荷綠 */
+    --accent-blue: #38BDF8;   /* 閒家專屬霧面冰河藍 */
+    --accent-dealer: #FB7185; /* 莊家專屬霧面玫瑰珊瑚紅 */
+    --accent-red: #FF6B6B;    /* 柔和珊瑚紅 */
+    --text-main: #E2E8F0;     /* 柔白文字 */
+    --text-sub: #8FA3BF;
+  }
+
+  /* 🌙 主題二：極致護眼夜間風 */
+  body.theme-night {
+    --bg-main: #0D1117;
+    --card-bg: #161B22;
+    --border-color: #21262D;
+    --accent-yellow: #F3E5AB;
+    --accent-green: #2EA043;
+    --accent-blue: #58A6FF;
+    --accent-dealer: #F472B6;
+    --accent-red: #DA3633;
+    --text-main: #C9D1D9;
+    --text-sub: #6E7681;
+  }
+
+  * { 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input[type="text"], input[type="number"], input[type="password"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  
+  html, body {
+    height: 100vh;
+    height: 100dvh;
+    width: 100vw;
+    margin: 0;
+    padding: 0;
+    overflow: hidden !important;
+    background: var(--bg-main); 
+    color: var(--text-main); 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    touch-action: manipulation;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+  
+  #loginOverlay, #evModalOverlay, #dealerCardModalOverlay, #historyCardModalOverlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(7, 9, 13, 0.88); z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 16px; overflow-y: auto;
+  }
+  .login-card {
+    background: #111722; border: 1.5px solid var(--accent-blue); border-radius: 14px;
+    padding: 20px 16px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  .login-title { font-size: 1.15rem; font-weight: 900; color: var(--accent-green); margin-bottom: 6px; }
+  .login-desc { font-size: 0.75rem; color: var(--text-sub); margin-bottom: 14px; }
+  .login-input {
+    width: 100%; background: #0B0E14; border: 1px solid #33445C; border-radius: 8px;
+    padding: 10px 12px; font-size: 1.1rem; color: #FFF; text-align: center; letter-spacing: 2px; margin-bottom: 10px;
+  }
+  .login-input:focus { outline: none; border-color: var(--accent-green); box-shadow: 0 0 8px rgba(56,217,169,0.4); }
+  .login-btn {
+    width: 100%; background: linear-gradient(90deg, #00875A, var(--accent-green)); border: none;
+    border-radius: 8px; padding: 10px; font-size: 0.95rem; font-weight: bold; color: #07090D; cursor: pointer;
+  }
+  .login-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
+  }
+
+  /* 🔑 獨立「12 組臨時碼與 3×4 訪客雷達」面板（僅主帳號可見） */
+  .master-panel-box {
+    background: var(--card-bg); border: 1px solid #D97706; border-radius: 8px;
+    padding: 6px 8px; margin-bottom: 3px; display: none; font-size: 0.7rem; flex-shrink: 0;
+    max-height: 46vh; overflow-y: auto;
+  }
+  .master-panel-box.active { display: block; }
+  .temp-code-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; gap: 4px;
+  }
+  .temp-code-title { font-size: 0.68rem; color: #FBBF24; font-weight: bold; }
+  .temp-code-actions { display: flex; align-items: center; gap: 5px; }
+  .temp-code-hint { font-size: 0.58rem; color: var(--text-sub); }
+  .btn-next-batch {
+    background: #2A220D; border: 1px solid var(--accent-yellow); color: var(--accent-yellow);
+    border-radius: 4px; padding: 1px 6px; font-size: 0.62rem; font-weight: bold; cursor: pointer;
+  }
+  .btn-next-batch:active { transform: scale(0.94); }
+  .temp-codes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .temp-code-item {
+    background: #0B0E14; border: 1px solid #2B384E; border-radius: 5px; padding: 4px 5px;
+    font-family: monospace; font-size: 0.72rem; font-weight: 900; color: #FFF; letter-spacing: 0.3px;
+    display: flex; flex-direction: column; gap: 3px; cursor: pointer; min-width: 0;
+  }
+  .temp-code-item:active { border-color: var(--accent-green); }
+  .temp-code-top {
+    display: flex; justify-content: space-between; align-items: center; gap: 2px; width: 100%;
+  }
+  .temp-code-num {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .temp-code-item.revoked .temp-code-num { color: #4B5768; text-decoration: line-through; }
+  .temp-code-item.revoked { border-color: #1C2433; }
+  .temp-code-status {
+    font-family: sans-serif; font-size: 0.52rem; font-weight: bold; padding: 1px 4px; border-radius: 3px;
+    background: #132720; color: var(--accent-green); border: 1px solid #009647; flex-shrink: 0;
+  }
+  .temp-code-item.online-now .temp-code-status {
+    background: #0E293D; color: var(--accent-blue); border-color: #0284C7;
+  }
+  .temp-code-item.revoked .temp-code-status {
+    background: #2B1214; color: #FDA4AF; border-color: #9F1239;
+  }
+  .temp-nick-input {
+    width: 100%; background: #131A26; border: 1px solid #29364B; border-radius: 3px;
+    color: #FDE047; font-family: sans-serif; font-size: 0.62rem; font-weight: bold;
+    padding: 2px 4px; outline: none; text-align: center;
+  }
+  .temp-nick-input::placeholder { color: #52637A; font-weight: normal; }
+  .temp-nick-input:focus { border-color: var(--accent-yellow); background: #192233; }
+
+  /* 🟢 訪客連線雷達 (3×4 網格) */
+  .radar-section {
+    margin-top: 6px; padding-top: 5px; border-top: 1px solid #263245;
+  }
+  .radar-title { font-size: 0.66rem; color: var(--accent-green); font-weight: bold; margin-bottom: 4px; }
+  .radar-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 110px; overflow-y: auto; }
+  .radar-row {
+    display: flex; flex-direction: column; justify-content: space-between; gap: 3px;
+    background: #0B0E14; border: 1px solid #233044; border-radius: 4px; padding: 3px 5px; font-size: 0.62rem; min-width: 0;
+  }
+  .radar-row-top {
+    display: flex; justify-content: space-between; align-items: center; gap: 2px;
+  }
+  .radar-user-label {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold;
+  }
+  .btn-kick {
+    background: #3B1214; border: 1px solid #E11D48; color: #FDA4AF; border-radius: 3px;
+    padding: 1px 4px; font-size: 0.54rem; font-weight: bold; cursor: pointer; flex-shrink: 0;
+  }
+
+  /* 📱 主容器單頁滿版 */
+  #appContainer { 
+    display: none; 
+    height: 100vh; 
+    height: 100dvh;
+    width: 100vw;
+    padding: 4px 6px 6px 6px; 
+    flex-direction: column;
+    overflow: hidden !important;
+  }
+
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; flex-shrink: 0; }
+  .title { font-size: 0.95rem; font-weight: 900; color: var(--accent-green); letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px; }
+  .header-actions { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+  .btn-top-action { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 2px 5px; font-size: 0.64rem; cursor: pointer; font-weight: bold; }
+  .btn-top-action:active { transform: scale(0.94); }
+  .btn-top-action.swap-btn { background: #162336; border-color: var(--accent-blue); color: var(--accent-blue); }
+  .btn-top-action.theme-btn { background: #1C2533; border-color: var(--accent-yellow); color: var(--accent-yellow); }
+  .btn-top-action.matrix-btn { background: #132720; border-color: #009647; color: var(--accent-green); }
+  .btn-top-action.sync-btn { background: #242614; border-color: #A3B812; color: #FFEA00; }
+  .btn-top-action.code-btn { background: #2B1D0E; border-color: #D97706; color: #FBBF24; display: none; }
+
+  /* 📡 獨立「雙機接力」面板 */
+  .sync-panel-box {
+    background: var(--card-bg); border: 1px solid var(--accent-yellow); border-radius: 8px;
+    padding: 6px 8px; margin-bottom: 3px; display: none; font-size: 0.7rem; flex-shrink: 0;
+  }
+  .sync-panel-box.active { display: block; }
+  .sync-panel-header { display: flex; justify-content: space-between; font-weight: bold; color: var(--accent-yellow); margin-bottom: 4px; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sync-controls { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .sync-input { background: #0B0E14; border: 1px solid #3B4B66; border-radius: 4px; color: #FFF; padding: 2px 4px; width: 65px; text-align: center; font-weight: bold; letter-spacing: 1px; outline: none; }
+  .sync-action-btn { background: #1E293B; border: 1px solid #3B4B66; color: #FFF; padding: 2px 6px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.68rem; }
+  .sync-action-btn:active { transform: scale(0.94); filter: brightness(1.3); }
+  .sync-status-badge { font-weight: bold; color: var(--text-sub); font-size: 0.66rem; }
+
+  .platform-switch-bar { display: grid; grid-template-columns: 1fr 1fr; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px; margin-bottom: 3px; gap: 4px; flex-shrink: 0; }
+  .platform-tab { text-align: center; padding: 3px; font-size: 0.68rem; font-weight: bold; color: var(--text-sub); border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+  .platform-tab.platform-active { background: #182535; color: var(--accent-blue); border-color: var(--accent-blue); font-weight: 900; }
+
+  .shoe-bar-wrap { margin-bottom: 3px; flex-shrink: 0; }
+  .shoe-bar-info { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-sub); margin-bottom: 1px; }
+  .shoe-progress-bg { width: 100%; height: 3px; background: #18202E; border-radius: 2px; overflow: hidden; }
+  .shoe-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-green)); transition: width 0.2s; }
+
+  /* 📍 橫向 1x4 設定列 */
+  .input-quad-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+  }
+  .input-card-box {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 3px 2px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+  }
+  .input-card-label { font-size: 0.58rem; color: var(--text-sub); font-weight: bold; margin-bottom: 1px; white-space: nowrap; }
+  .bankroll-input-stat {
+    width: 92%; background: #0B0E14; color: var(--accent-green); border: 1px solid var(--border-color);
+    border-radius: 4px; padding: 1px 0; font-size: 0.72rem; font-weight: 900; text-align: center; outline: none; letter-spacing: 0.5px;
+  }
+  .bankroll-input-stat:focus { border-color: var(--accent-green); }
+  .room-input-stat {
+    color: var(--accent-yellow) !important;
+    text-align-last: center;
+    cursor: pointer;
+    height: 19px;
+  }
+
+  /* 🎯 雙欄主區域（支援左右一鍵對調） */
+  .main-layout-container { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: row;
+    gap: 5px; 
+    min-height: 0; 
+    overflow: hidden !important; 
+  }
+  .main-layout-container.swap-layout {
+    flex-direction: row-reverse;
+  }
+
+  .main-left-panel {
+    width: 50%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+  }
+
+  .main-right-panel {
+    width: 50%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+  }
+
+  /* 📊 建議下注金額卡片（已移除半注與微注，並放大總 EV % 字體） */
+  .stat-breakdown-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--accent-yellow);
+    border-radius: 8px;
+    padding: 5px 6px;
+    flex-shrink: 0;
+  }
+  .stat-breakdown-header {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+  }
+  .stat-breakdown-title {
+    font-size: 0.62rem;
+    color: var(--text-sub);
+    font-weight: bold;
+  }
+  .stat-breakdown-amount {
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: var(--accent-yellow);
+    margin-top: 1px;
+    line-height: 1.15;
+  }
+  .stat-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.65rem;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-main);
+  }
+  .stat-row-total {
+    font-size: 0.86rem;
+    font-weight: 900;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 3px;
+    margin-top: 2px;
+  }
+
+  /* 🃏 鍵盤外框面板（閒家=霧面冰河藍 / 莊家=霧面玫瑰珊瑚紅） */
+  .grid-keypad-box { 
+    background: var(--card-bg); 
+    border: 1px solid #264A70; 
+    border-radius: 8px; 
+    padding: 4px; 
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  body.dealer-mode-locked .grid-keypad-box {
+    border-color: #9F1239;
+    background: #231117;
+  }
+
+  .mode-switch-bar { display: grid; grid-template-columns: 1fr 1fr; background: #0D1117; border: 1px solid var(--border-color); border-radius: 5px; padding: 2px; margin-bottom: 3px; gap: 3px; flex-shrink: 0; }
+  .mode-tab { text-align: center; padding: 3px 2px; font-size: 0.68rem; font-weight: bold; color: var(--text-sub); border-radius: 4px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  /* 閒家按鈕：霧面冰河藍 */
+  .mode-tab.shoe-active {
+    background: #143252;
+    color: #E0F2FE;
+    border-color: #38BDF8;
+    font-weight: 900;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.22);
+  }
+  /* 莊家按鈕：霧面玫瑰珊瑚紅 */
+  .mode-tab.dealer-active {
+    background: #4A1522;
+    color: #FFE4E6;
+    border-color: #FB7185;
+    font-weight: 900;
+    box-shadow: 0 0 8px rgba(251, 113, 133, 0.22);
+  }
+
+  .last-tap-bar {
+    background: #0B0E14;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 5px;
+    margin-bottom: 3px;
+    font-size: 0.62rem;
+    font-weight: 900;
+    text-align: center;
+    color: var(--text-sub);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .last-tap-bar.tap-player {
+    color: #BAE6FD;
+    border-color: #0284C7;
+    background: #0F2942;
+  }
+  .last-tap-bar.tap-dealer {
+    color: #FFE4E6;
+    border-color: #E11D48;
+    background: #3B121D;
+  }
+  .last-tap-bar.tap-burn {
+    color: #FDBA74;
+    border-color: #9A5B13;
+    background: #261A0E;
+  }
+  .btn-undo-shuffle {
+    background: #D97706;
+    color: #07090D;
+    border: 1px solid #FDE047;
+    border-radius: 3px;
+    padding: 0 5px;
+    margin-left: 4px;
+    font-size: 0.6rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  .btn-undo-shuffle:active { transform: scale(0.94); }
+  .tamper-alert-bar {
+    background: #450A0A;
+    border: 1.5px solid #EF4444;
+    border-radius: 4px;
+    padding: 2px 5px;
+    margin-bottom: 3px;
+    font-size: 0.62rem;
+    font-weight: 900;
+    color: #FEE2E2;
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    animation: pulseTamper 1.2s infinite;
+  }
+  @keyframes pulseTamper {
+    0% { border-color: #EF4444; background: #450A0A; }
+    50% { border-color: #FACC15; background: #7F1D1D; }
+    100% { border-color: #EF4444; background: #450A0A; }
+  }
+  .btn-dismiss-tamper {
+    background: #7F1D1D;
+    border: 1px solid #FCA5A5;
+    color: #FFF;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 0.58rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .keypad-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    grid-template-rows: repeat(4, 35px); 
+    gap: 3px; 
+  }
+
+  /* 閒家模式按鍵：深海霧藍調（護眼低眩光） */
+  .btn-grid-card { 
+    background: #13283E; color: #FFFFFF; border: 1px solid #28527A; border-radius: 6px; 
+    height: 35px;
+    text-align: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex;
+    flex-direction: column; justify-content: center; align-items: center; padding: 1px 0;
+    position: relative;
+  }
+  .grid-card-val { font-size: 0.85rem; font-weight: 900; color: #7DD3FC; line-height: 1; }
+  .grid-card-sub { font-size: 0.45rem; color: #94B3D1; margin-top: 1px; }
+  .btn-card-a .grid-card-val { color: #FCA5A5 !important; }
+
+  /* 莊家模式按鍵：暖暮酒紅／玫瑰珊瑚調（護眼不刺眼） */
+  body.dealer-mode-locked .btn-grid-card:not(.btn-burn-card):not(.btn-reset-in-keypad) {
+    background: #381520;
+    border-color: #9F1239;
+  }
+  body.dealer-mode-locked .btn-grid-card:not(.btn-burn-card):not(.btn-reset-in-keypad) .grid-card-val {
+    color: #FECDD3;
+  }
+  body.dealer-mode-locked .btn-grid-card:not(.btn-burn-card):not(.btn-reset-in-keypad) .grid-card-sub {
+    color: #D69BA6;
+  }
+  body.dealer-mode-locked .btn-card-a .grid-card-val {
+    color: #FDE047 !important;
+  }
+
+  .btn-burn-card { background: #221A11; border-color: #4A331A; }
+  .btn-burn-card .grid-card-val { color: #FF9F0A; }
+  .btn-reset-in-keypad { background: #2B1214; border-color: #5C2226; color: var(--accent-red); }
+  .btn-reset-in-keypad .grid-card-val { color: var(--accent-red); }
+
+  @keyframes padFlashPlayer {
+    0% { background-color: #0284C7; border-color: #E0F2FE; box-shadow: 0 0 10px #38BDF8; transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  @keyframes padFlashDealer {
+    0% { background-color: #E11D48; border-color: #FFE4E6; box-shadow: 0 0 10px #FB7185; transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  @keyframes padFlashBurn {
+    0% { background-color: #D97706; border-color: #FFFFFF; box-shadow: 0 0 10px #FBBF24; transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  .btn-flash-player { animation: padFlashPlayer 0.22s ease-out; }
+  .btn-flash-dealer { animation: padFlashDealer 0.22s ease-out; }
+  .btn-flash-burn   { animation: padFlashBurn 0.22s ease-out; }
+
+  /* 📜 紀錄牌局 (霧藍=閒家 / 玫瑰紅=莊家 / 棕色=銷牌 / 最新黃框) */
+  .history-panel { 
+    background: var(--card-bg); 
+    border: 1px solid var(--border-color); 
+    border-radius: 8px; 
+    padding: 4px; 
+    display: flex; 
+    flex-direction: column; 
+    flex: 1.2;
+    min-height: 0;
+  }
+  
+  .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 0.62rem; color: var(--text-sub); font-weight: bold; flex-shrink: 0; gap: 3px; }
+  .legend-pills { display: flex; gap: 3px; align-items: center; flex-shrink: 0; }
+  .legend-pill-p { background: #122B44; border: 1px solid #2E6699; color: #93C5FD; padding: 0 4px; border-radius: 3px; font-size: 0.56rem; }
+  .legend-pill-d { background: #3D1420; border: 1px solid #E11D48; color: #FDA4AF; padding: 0 4px; border-radius: 3px; font-size: 0.56rem; }
+
+  .history-grid-box {
+    display: grid; 
+    grid-template-columns: repeat(7, 1fr) !important; 
+    grid-auto-rows: 23px !important; 
+    gap: 2.5px !important; 
+    background: #0B0E14; 
+    border: 1px solid var(--border-color); 
+    border-radius: 5px; 
+    padding: 3px; 
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important; 
+    align-content: start;
+    contain: content;
+  }
+  
+  /* 閒家紀錄格（霧面冰河藍） */
+  .history-cell {
+    background: #122B44; 
+    border: 1px solid #2E6699; 
+    border-radius: 3px; 
+    height: 23px !important; 
+    box-sizing: border-box;
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    font-size: 0.75rem; 
+    font-weight: 900; 
+    color: #93C5FD; 
+    cursor: pointer; 
+    position: relative; 
+    transition: transform 0.1s, filter 0.15s;
+  }
+  .history-cell .card-idx-tag {
+    position: absolute; top: 1px; right: 2px; font-size: 0.38rem; color: #BAE6FD; font-weight: normal; line-height: 1; opacity: 0.85;
+  }
+
+  /* 莊家紀錄格（霧面玫瑰珊瑚紅） */
+  .history-cell.dealer-cell {
+    background: #3D1420;
+    border-color: #E11D48;
+    color: #FDA4AF;
+  }
+  .history-cell.dealer-cell .card-idx-tag {
+    color: #FECDD3;
+  }
+
+  /* Ø 銷牌紀錄格（棕色） */
+  .history-cell.burn-cell { color: #D99B52; border-color: #6B441A; background: #261A0E; }
+  .history-cell.burn-cell .card-idx-tag { color: #B47B38; }
+
+  /* 🟡 最新一張黃框標示 */
+  .history-cell.newest-ring {
+    border: 1.5px solid #FACC15 !important;
+    box-shadow: 0 0 6px rgba(250, 204, 21, 0.75);
+  }
+
+  .history-cell:active { transform: scale(0.92); filter: brightness(1.25); }
+  .history-cell.empty { background: #141A24; border-color: var(--border-color); color: var(--text-sub); font-size: 0.62rem; cursor: default; height: 23px !important; }
+
+  /* 🎯 莊家面板（與莊家模式統一為霧面玫瑰珊瑚紅，不刺眼） */
+  .dealer-panel {
+    background: var(--card-bg); 
+    border: 1px solid #881337; 
+    border-radius: 8px; 
+    padding: 4px; 
+    display: flex; 
+    flex-direction: column; 
+    flex: 0.95;
+    min-height: 0;
+  }
+  .dealer-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; flex-shrink: 0; }
+  .dealer-panel-title { font-size: 0.68rem; font-weight: bold; color: var(--accent-dealer); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .dealer-action-group { display: flex; gap: 3px; }
+  .btn-dealer-action { background: #3D1420; border: 1px solid #FB7185; color: #FFE4E6; border-radius: 4px; width: 20px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; cursor: pointer; font-weight: 900; }
+  .btn-dealer-action:active { background: #E11D48; color: #FFF; transform: scale(0.92); }
+
+  .dealer-current-row { 
+    background: #1A0B10; border: 1px solid #6B142C; border-radius: 5px; padding: 2px 4px; 
+    margin-bottom: 3px; height: 23px; max-height: 23px; overflow-x: auto; overflow-y: hidden; display: flex; align-items: center; flex-shrink: 0;
+  }
+  .dealer-cards-flex { display: flex; gap: 3px; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
+  .dealer-card-chip { 
+    background: #4A1522; border: 1px solid #FB7185; color: #FFE4E6; padding: 1px 5px; border-radius: 3px; 
+    font-size: 0.7rem; font-weight: 900; cursor: pointer; flex-shrink: 0; height: 17px; display: flex; align-items: center; 
+    transition: transform 0.1s, background 0.1s;
+  }
+  .dealer-card-chip:active {
+    background: #E11D48;
+    border-color: #FFFFFF;
+    color: #FFFFFF;
+    transform: scale(0.92);
+  }
+  .shoe-mode-locked .dealer-card-chip { cursor: default; opacity: 0.92; }
+
+  .dealer-history-list { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 2.5px !important; 
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important; 
+  }
+  .dealer-history-row { 
+    background: #1A0D12; 
+    border: 1px solid #4C1324; 
+    border-radius: 4px; 
+    padding: 2px 4px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    font-size: 0.65rem; 
+    height: 22px !important; 
+    min-height: 22px !important; 
+    box-sizing: border-box;
+    flex-shrink: 0;
+    gap: 3px;
+  }
+  .dh-round { color: #FDA4AF; font-weight: bold; font-size: 0.6rem; flex-shrink: 0; white-space: nowrap; }
+  .dh-cards { 
+    display: flex; 
+    gap: 2.5px; 
+    flex-wrap: nowrap !important; 
+    overflow-x: auto !important; 
+    overflow-y: hidden; 
+    flex: 1; 
+    align-items: center;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dh-cards::-webkit-scrollbar { display: none; }
+  .dh-tag { 
+    background: #4A1522; 
+    color: #FFE4E6; 
+    padding: 1px 4px; 
+    border-radius: 3px; 
+    font-size: 0.64rem; 
+    font-weight: 900; 
+    cursor: pointer; 
+    border: 1px solid #FB7185; 
+    flex-shrink: 0;
+    line-height: 1.2;
+    transition: background 0.1s, transform 0.1s;
+  }
+  .dh-tag:active, .dh-tag.editing-active {
+    background: #E11D48;
+    border-color: #FFFFFF;
+    color: #FFFFFF;
+    transform: scale(0.92);
+  }
+  .dh-pts-badge {
+    font-weight: bold;
+    font-size: 0.65rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body class="shoe-mode-locked">
+
+<!-- 🔒 登入遮罩（完全淨空，重整或關閉網頁即登出） -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-title">🔒 請輸入通關密語</div>
+    <input type="password" id="txtPassword" class="login-input" placeholder="••••••" onkeydown="if(event.key==='Enter') checkPassword()">
+    <button type="button" id="btnLoginSubmit" class="login-btn" onclick="checkPassword()">解鎖進入</button>
+    <div id="loginError" style="color:var(--accent-red); font-size:0.75rem; margin-top:8px; font-weight:bold;"></div>
+  </div>
+</div>
+
+<!-- 📊 標準 EV 動態快選彈窗 -->
+<div id="evModalOverlay" style="display:none;">
+  <div class="login-card" style="max-width:300px; text-align:center;">
+    <div class="login-title" id="evModalTitle" style="text-align:center; margin-bottom:12px;">📊 選擇標準 EV (%)</div>
+    <div id="evOptionsBox" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+    
+    <div style="font-size:0.72rem; color:var(--text-sub); margin-bottom:4px; text-align:left; font-weight:bold;">自訂 EV (%)：</div>
+    <div style="display:flex; gap:6px; margin-bottom:12px;">
+      <input type="number" step="0.01" id="txtCustomEV" class="login-input" placeholder="-0.55" style="margin-bottom:0; font-size:0.9rem; padding:6px;">
+      <button type="button" class="login-btn" style="width:75px; padding:6px; font-size:0.8rem;" onclick="applyCustomEv()">套用</button>
+    </div>
+    <button type="button" class="login-btn" style="background:#2A3447; color:#FFF; font-size:0.8rem; padding:6px;" onclick="closeEvModal()">關閉</button>
+  </div>
+</div>
+
+<!-- 🔄 記錄牌局圖形化修改／刪除彈窗 -->
+<div id="historyCardModalOverlay" style="display:none;">
+  <div class="login-card" style="max-width:320px; text-align:center; border-color:var(--accent-yellow); background:#111722;">
+    <div class="login-title" style="text-align:center; margin-bottom:4px; color:var(--accent-yellow); font-size:1.05rem;">🔄 修改或刪除紀錄牌</div>
+    <div id="historyModalSubtitle" style="font-size:0.75rem; color:var(--text-sub); margin-bottom:12px; font-weight:bold;">第 1 張 [8] ➔ 點擊下方替換</div>
+    
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#FCA5A5; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(1)">A</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(2)">2</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(3)">3</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(4)">4</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(5)">5</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(6)">6</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(7)">7</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(8)">8</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(9)">9</button>
+      <button type="button" class="login-btn" style="background:#13283E; border:1px solid #28527A; color:#7DD3FC; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyHistoryCardReplacement(10)">10</button>
+      <button type="button" class="login-btn" style="background:#b91c1c; border:none; color:#FFF; font-size:1rem; font-weight:bold; padding:10px 0;" onclick="deleteHistoryCard()">🗑️</button>
+      <button type="button" class="login-btn" style="background:#334155; border:none; color:#FFF; font-size:1rem; font-weight:bold; padding:10px 0;" onclick="closeHistoryCardModal()">✖️</button>
+    </div>
+  </div>
+</div>
+
+<!-- 🔄 莊家牌點數修改彈窗（霧面玫瑰珊瑚紅） -->
+<div id="dealerCardModalOverlay" style="display:none;">
+  <div class="login-card" style="max-width:320px; text-align:center; border-color:var(--accent-dealer); background:#1A0B10;">
+    <div class="login-title" style="text-align:center; margin-bottom:4px; color:var(--accent-dealer); font-size:1.05rem;">🔄 選擇替換的莊家牌點數</div>
+    <div id="dealerModalSubtitle" style="font-size:0.75rem; color:var(--text-sub); margin-bottom:12px; font-weight:bold;">目前 [8] ➔ 點擊下方進行替換</div>
+    
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:6px;">
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FDE047; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(1)">A</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(2)">2</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(3)">3</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(4)">4</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(5)">5</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(6)">6</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(7)">7</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(8)">8</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(9)">9</button>
+      <button type="button" class="login-btn" style="background:#381520; border:1px solid #9F1239; color:#FECDD3; font-size:1rem; font-weight:900; padding:10px 0;" onclick="applyDealerCardReplacement(10)">10</button>
+      <button type="button" class="login-btn" style="background:#b91c1c; border:none; color:#FFF; font-size:1rem; font-weight:bold; padding:10px 0;" onclick="deleteDealerHistoryCard()">🗑️</button>
+      <button type="button" class="login-btn" style="background:#334155; border:none; color:#FFF; font-size:1rem; font-weight:bold; padding:10px 0;" onclick="closeDealerCardModal()">✖️</button>
+    </div>
+  </div>
+</div>
+
+<div id="appContainer">
+  <div class="header">
+    <div class="title" id="mainTitle">Sen</div>
+    <div class="header-actions">
+      <button type="button" id="btnMasterCodes" class="btn-top-action code-btn" onclick="toggleMasterCodesPanel()">🔑 臨時碼</button>
+      <button type="button" class="btn-top-action swap-btn" onclick="toggleLayout()">🔄 左右</button>
+      <button type="button" class="btn-top-action theme-btn" onclick="toggleTheme()">🎨 主題</button>
+      <button type="button" class="btn-top-action sync-btn" onclick="toggleSyncPanel()">📡 雙機接力</button>
+      <button type="button" class="btn-top-action matrix-btn" onclick="openMatrixNewTab()">📊 策略表</button>
+    </div>
+  </div>
+
+  <!-- 🔑 獨立面板一：主帳號專屬 12 組 (3×4) 動態臨時通行碼＋暱稱＋3×4 訪客雷達（訪客不可見） -->
+  <div id="masterCodePanel" class="master-panel-box">
+    <div class="temp-code-header">
+      <span class="temp-code-title" id="tempBatchTitle">🎫 12 組臨時通行碼</span>
+      <div class="temp-code-actions">
+        <span id="tempCopyNotice" class="temp-code-hint">點號碼複製</span>
+        <button type="button" class="btn-next-batch" onclick="generateNextBatch()">➕ 換一批</button>
+      </div>
+    </div>
+    <div id="tempCodesGrid" class="temp-codes-grid"></div>
+
+    <div class="radar-section">
+      <div class="radar-title">🟢 訪客在線雷達</div>
+      <div id="guestRadarBox" class="radar-list">
+        <div style="grid-column: span 3; font-size:0.62rem; color:var(--text-sub); text-align:center;">目前無訪客在線</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📡 獨立面板二：純雙向接力連動（不含任何密碼） -->
+  <div id="syncPanel" class="sync-panel-box">
+    <div class="sync-panel-header">
+      <span>📡 雙向接力連動</span>
+      <span id="syncStatus" class="sync-status-badge">⚪ 未連線</span>
+    </div>
+    <div class="sync-controls">
+      <button type="button" class="sync-action-btn" style="background:#013318; border-color:#009647; color:#00FF88;" onclick="createRoom()">➕ 創房</button>
+      <span>或</span>
+      <input type="text" id="txtRoomId" class="sync-input" placeholder="4位房號" maxlength="4">
+      <button type="button" class="sync-action-btn" style="background:#0A2233; border-color:#00D8FF; color:#00D8FF;" onclick="joinRoom()">🔗 加入</button>
+      <button type="button" class="sync-action-btn" style="background:#2A220D; border-color:#E2B85C; color:#E2B85C;" onclick="forceSyncNow()" title="只拉取最新進度，不會反向覆蓋對方">🔄 補抓同步</button>
+    </div>
+  </div>
+
+  <div class="platform-switch-bar">
+    <div id="btnPlatformSA" class="platform-tab platform-active" onclick="setPlatform('SA')">SA 模式 (有投降)</div>
+    <div id="btnPlatformDB" class="platform-tab" onclick="setPlatform('DB')">DB 模式 (無投降)</div>
+  </div>
+
+  <div class="shoe-bar-wrap">
+    <div class="shoe-bar-info">
+      <span>牌靴滲透率: <b id="txtPenetration" style="color:var(--text-main);">0%</b></span>
+      <span>已消耗: <b id="txtDealtCards" style="color:var(--text-main);">0</b> / <span id="txtTotalCards">416</span> 張</span>
+    </div>
+    <div class="shoe-progress-bg">
+      <div id="shoeProgressFill" class="shoe-progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- 📍 橫向 1x4 設定列 -->
+  <div class="input-quad-row">
+    <div class="input-card-box">
+      <span class="input-card-label">本金 ($)</span>
+      <input type="number" id="cfgBankroll" class="bankroll-input-stat" value="" oninput="applyConfig()">
+    </div>
+    <div class="input-card-box">
+      <span class="input-card-label">返水 %</span>
+      <input type="number" id="cfgRebate" class="bankroll-input-stat" value="" oninput="applyConfig()">
+    </div>
+    <div class="input-card-box" onclick="openEvModal()" style="cursor:pointer;">
+      <span class="input-card-label">📊 標準EV (%)</span>
+      <input type="number" step="0.00001" id="cfgBaseEV" class="bankroll-input-stat" placeholder="-0.53" value="-0.53" readonly style="cursor:pointer;">
+    </div>
+    <div class="input-card-box">
+      <span class="input-card-label">🏠 房號</span>
+      <select id="cfgTableRoomId" class="bankroll-input-stat room-input-stat" onchange="applyConfig()">
+        <option value="Ｄ廳">Ｄ廳</option>
+        <option value="Ｍ廳">Ｍ廳</option>
+        <option value="無限21">無限21</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 📱 雙欄固定滿版主區域（可一鍵左右對調） -->
+  <div id="mainLayoutContainer" class="main-layout-container">
+    
+    <!-- 👈 歷史紀錄/莊家區 -->
+    <div class="main-left-panel">
+      
+      <!-- 📜 記錄牌局 -->
+      <div class="history-panel" id="historyPanelBox">
+        <div class="history-header">
+          <span id="historyTitleText">📜 記錄牌局(點藍牌修改)</span>
+          <div class="legend-pills">
+            <span class="legend-pill-p">閒</span>
+            <span class="legend-pill-d">莊</span>
+          </div>
+        </div>
+        <div id="historyGrid" class="history-grid-box">
+          <div class="history-cell empty" style="grid-column: span 7; text-align:center;">尚無記錄</div>
+        </div>
+      </div>
+
+      <!-- 莊家面板（霧面玫瑰珊瑚紅） -->
+      <div class="dealer-panel">
+        <div class="dealer-panel-header">
+          <div class="dealer-panel-title">
+            <span id="dealerTitleText">莊家</span>
+            <span id="dealerSumBadge" style="font-size: 0.68rem; color:#FECDD3; font-weight:normal;">Pts: 0</span>
+            <span id="dealerAlertBadge" style="font-size:0.65rem; font-weight:bold; margin-left:2px;"></span>
+          </div>
+          <div class="dealer-action-group">
+            <button type="button" class="btn-dealer-action btn-plus" onclick="nextDealerRound()" title="結算下一局">＋</button>
+          </div>
+        </div>
+        <div class="dealer-current-row">
+          <div id="dealerCurrentCards" class="dealer-cards-flex">
+            <span style="font-size: 0.68rem; color:var(--text-sub);">請切換「莊家」模式記錄...</span>
+          </div>
+        </div>
+        <div id="dealerHistoryList" class="dealer-history-list">
+          <div style="font-size: 0.68rem; color:var(--text-sub); text-align:center; padding: 2px;">尚無過往紀錄</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 👉 記牌/下注區 -->
+    <div class="main-right-panel">
+      
+      <!-- 📊 建議下注金額卡片（已移除半注與微注，並放大總 EV % 字體） -->
+      <div class="stat-breakdown-card">
+        <div class="stat-breakdown-header">
+          <div class="stat-breakdown-title">建議下注金額</div>
+          <div id="valBetMain" class="stat-breakdown-amount">$0.00</div>
+        </div>
+        
+        <div class="stat-breakdown-list">
+          <div class="stat-row">
+            <span>Hi-Lo 真數</span>
+            <span id="valTC_RC" style="font-weight:bold; color:var(--accent-blue);">+0.0 (RC: 0)</span>
+          </div>
+          <div class="stat-row">
+            <span>牌面 %</span>
+            <span id="valEV_Card" style="color:var(--accent-green); font-weight:bold;">+0.00%</span>
+          </div>
+          <div class="stat-row">
+            <span>勝率 EV %</span>
+            <span id="valEV_Base" style="color:var(--accent-red); font-weight:bold;">-0.53%</span>
+          </div>
+          <div class="stat-row">
+            <span>返水 %</span>
+            <span id="valEV_Rebate" style="color:var(--accent-green); font-weight:bold;">+0.00%</span>
+          </div>
+          <div class="stat-row stat-row-total">
+            <span>總 EV %</span>
+            <span id="valEV_Total" style="color:var(--accent-blue); font-weight:900;">-0.53%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 記牌按鍵 -->
+      <div class="grid-keypad-box">
+        <div class="mode-switch-bar">
+          <div id="tabShoe" class="mode-tab shoe-active" onclick="switchMode('shoe')">閒家</div>
+          <div id="tabDealer" class="mode-tab" onclick="switchMode('dealer')">莊家</div>
+        </div>
+
+        <div id="tamperAlertBar" class="tamper-alert-bar">
+          <span id="tamperAlertText"></span>
+          <button type="button" class="btn-dismiss-tamper" onclick="dismissTamperAlert()">✖</button>
+        </div>
+
+        <div id="lastTapBanner" class="last-tap-bar">就緒 — 點擊下方按鍵記牌</div>
+
+        <div class="keypad-grid">
+          <div class="btn-grid-card btn-card-a" onclick="handlePadClick(1, this)"><div class="grid-card-val">A</div><div class="grid-card-sub" id="rem-1">剩 32</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(2, this)"><div class="grid-card-val">2</div><div class="grid-card-sub" id="rem-2">剩 32</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(3, this)"><div class="grid-card-val">3</div><div class="grid-card-sub" id="rem-3">剩 32</div></div>
+          
+          <div class="btn-grid-card" onclick="handlePadClick(4, this)"><div class="grid-card-val">4</div><div class="grid-card-sub" id="rem-4">剩 32</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(10, this)"><div class="grid-card-val">10</div><div class="grid-card-sub" id="rem-10">剩 128</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(6, this)"><div class="grid-card-val">6</div><div class="grid-card-sub" id="rem-6">剩 32</div></div>
+          
+          <div class="btn-grid-card" onclick="handlePadClick(7, this)"><div class="grid-card-val">7</div><div class="grid-card-sub" id="rem-7">剩 32</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(5, this)"><div class="grid-card-val">5</div><div class="grid-card-sub" id="rem-5">剩 32</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(9, this)"><div class="grid-card-val">9</div><div class="grid-card-sub" id="rem-9">剩 32</div></div>
+          
+          <div class="btn-grid-card btn-burn-card" onclick="handleBurnClick(this)"><div class="grid-card-val">Ø</div><div class="grid-card-sub">銷牌</div></div>
+          <div class="btn-grid-card" onclick="handlePadClick(8, this)"><div class="grid-card-val">8</div><div class="grid-card-sub" id="rem-8">剩 32</div></div>
+          <div class="btn-grid-card btn-reset-in-keypad" onclick="resetShoe()"><div class="grid-card-val">🔄</div><div class="grid-card-sub">洗牌</div></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function _senCoreApp() {
+  // 🛡️ 前端基礎防窺（禁用右鍵與檢視原始碼快捷鍵）
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && e.keyCode === 73) || (e.ctrlKey && e.keyCode === 85)) {
+      e.preventDefault();
+    }
+  });
+
+  // 🔐 隱藏主密碼演算（原始碼與頂層變數完全不出現密碼明文，完美支援 VM 虛擬機混淆）
+  function _getMasterSecret() {
+    let partA = (0x2d13682 << 1) + 1;
+    return String(partA);
+  }
+
+  function _verifyMasterInput(candidate) {
+    if (typeof candidate !== "string" || candidate.length !== 8) return false;
+    let secret = _getMasterSecret();
+    if (candidate !== secret) return false;
+    let h = 2166136261;
+    let salted = "sen_gate_" + candidate + "_ok";
+    for (let i = 0; i < salted.length; i++) {
+      h ^= salted.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) === 3214089045;
+  }
+
+  // 🚀 每次更新程式碼皆遞增版本指紋：主機一登入新版，所有未重整的舊網頁 0.5 秒內強制登出重取密碼
+  const APP_BUILD_ID = "sen_v20261119_06";
+  const myClientId = 'bj_dev_' + Math.random().toString(36).substr(2, 9);
+  const VALID_ROOMS = ["Ｄ廳", "Ｍ廳", "無限21"];
+
+  /* 🔒 分頁獨立隔離機制 */
+  let tabUid = "";
+  try {
+    tabUid = sessionStorage.getItem("bj_tab_uid");
+    if (!tabUid) {
+      tabUid = "tab_" + Date.now().toString(36) + "_" + Math.random().toString(36).substr(2, 5);
+      sessionStorage.setItem("bj_tab_uid", tabUid);
+    }
+  } catch (e) {
+    tabUid = "tab_" + Math.random().toString(36).substr(2, 8);
+  }
+  const STATE_STORAGE_KEY = "bj_pro_gamestate_v4_" + tabUid;
+  const STRATEGY_CHANNEL_NAME = "bj_tc_sync_" + tabUid;
+  const strategySyncChannel = new BroadcastChannel(STRATEGY_CHANNEL_NAME);
+
+  let config = { bankroll: 0, rebate: 0, baseEV: -0.53, tableRoomId: "Ｄ廳", decks: 8, platform: "SA" };
+  let historyStack = [];
+  let currentMode = 'shoe';
+  let currentDealerCards = [];
+  let dealerHistoryRounds = [];
+  let editingDealerCardTarget = null;
+  let editingHistoryCardIndex = -1;
+
+  // 🔄 洗牌誤觸補救快照（15 秒內可一鍵救回整靴數據）
+  let lastShoeSnapshot = null;
+  let shoeBackupTimer = null;
+
+  // 🔒 登入權限狀態（僅存在記憶體中，重新整理或關閉網頁立刻清空強制登出）
+  let authRole = null;
+  let authCode = null;
+  let currentBatchIndex = 1;
+  let batchUpdatedTs = 0;
+  let revokedTempCodes = [];
+  let claimedCodes = {};
+  let codeNicknames = {};
+  let activeTempCodes = [];
+  let activeGuests = {};
+  let hasReceivedCloudAuth = false;
+  let pendingGuestVerify = null;
+  let nickSyncTimer = null;
+
+  let mqttClient = null;
+  let radarClient = null;
+  const AUTH_SYNC_TOPIC = "bj_auth_batch_sync_v10_" + _getMasterSecret();
+  const RADAR_TOPIC = "bj_secret_radar_v10_" + _getMasterSecret();
+
+  // 🛡️ 舊版頻道清除清單（主機登入新版時一併清空舊版 v8 / v9 / v12 連線，確保所有舊網頁全數強制登出）
+  const LEGACY_AUTH_TOPICS = [
+    "bj_auth_batch_sync_v8_" + _getMasterSecret(),
+    "bj_auth_batch_sync_v9_" + _getMasterSecret()
+  ];
+  const LEGACY_RADAR_TOPICS = [
+    "bj_secret_radar_v8_" + _getMasterSecret(),
+    "bj_secret_radar_v9_" + _getMasterSecret()
+  ];
+  function getLegacyV12RadarTopic() {
+    let d = new Date();
+    return `bj_secret_radar_v12_${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
+
+  let currentRoomTopic = "";
+  let activeRoomCode = "";
+  let isRoomHost = false;
+  let isRemoteUpdating = false;
+  let broadcastTimer = null;
+  let lastStateTimestamp = 0;
+  let pendingAuditAction = "";
+
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (err) {}
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      requestWakeLock();
+      if (activeRoomCode) {
+        if (mqttClient && mqttClient.connected && currentRoomTopic) {
+          mqttClient.subscribe(currentRoomTopic, { qos: 1 });
+          mqttClient.publish(currentRoomTopic, JSON.stringify({ type: 'REQ_STATE', senderId: myClientId }));
+        } else {
+          initMqtt(activeRoomCode, false);
+        }
+      }
+    }
+  });
+
+  function triggerVibrate(pattern = 12) {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(pattern); } catch(e) {}
+    }
+  }
+
+  function triggerBtnFlash(el, flashType) {
+    if (!el) return;
+    el.classList.remove("btn-flash-player", "btn-flash-dealer", "btn-flash-burn");
+    void el.offsetWidth;
+    if (flashType === 'dealer') el.classList.add("btn-flash-dealer");
+    else if (flashType === 'burn') el.classList.add("btn-flash-burn");
+    else el.classList.add("btn-flash-player");
+  }
+
+  function getActorLabel() {
+    if (authRole === "master") return "主機";
+    if (authRole === "guest" && authCode) {
+      let nick = (codeNicknames[authCode] || "").trim();
+      return nick ? `訪客 ${nick} [${authCode}]` : `訪客 [${authCode}]`;
+    }
+    return "未知裝置";
+  }
+
+  function showTamperAlert(msg) {
+    let bar = document.getElementById("tamperAlertBar");
+    let txt = document.getElementById("tamperAlertText");
+    if (!bar || !txt) return;
+    txt.innerText = `🚨 ${msg} (${formatNowTime()})`;
+    bar.style.display = "flex";
+    triggerVibrate([100, 50, 100]);
+  }
+
+  function dismissTamperAlert() {
+    triggerVibrate();
+    let bar = document.getElementById("tamperAlertBar");
+    if (bar) bar.style.display = "none";
+  }
+
+  function updateLastTapBanner(text, type) {
+    let banner = document.getElementById("lastTapBanner");
+    if (!banner) return;
+    banner.className = "last-tap-bar";
+    if (type === 'player') banner.classList.add("tap-player");
+    else if (type === 'dealer') banner.classList.add("tap-dealer");
+    else if (type === 'burn') banner.classList.add("tap-burn");
+
+    if (lastShoeSnapshot && lastShoeSnapshot.historyStack && lastShoeSnapshot.historyStack.length > 0) {
+      let snapCount = lastShoeSnapshot.historyStack.length;
+      banner.innerHTML = `<span>${text}</span><button type="button" class="btn-undo-shuffle" onclick="undoResetShoe()">↩️ 復原洗牌(${snapCount}張)</button>`;
+    } else {
+      banner.innerText = text;
+    }
+  }
+
+  function formatNowTime() {
+    let now = new Date();
+    let hh = String(now.getHours()).padStart(2, '0');
+    let mm = String(now.getMinutes()).padStart(2, '0');
+    let ss = String(now.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  }
+
+  function updateSyncStatusBadge(noteText = "") {
+    let statusEl = document.getElementById("syncStatus");
+    if (!statusEl || !activeRoomCode) return;
+    let color = isRoomHost ? "var(--accent-green)" : "var(--accent-blue)";
+    let timeStr = formatNowTime();
+    let countStr = `${historyStack.length}張`;
+    statusEl.innerHTML = `🟢 房號 <b style="color:${color}; font-size:0.85rem;">${activeRoomCode}</b> | 已同步 <b>${countStr}</b> (${timeStr})${noteText ? ' ' + noteText : ''}`;
+  }
+
+  /* 🔄 左右對調切換與記憶 */
+  function toggleLayout() {
+    triggerVibrate();
+    let container = document.getElementById("mainLayoutContainer");
+    if (!container) return;
+    container.classList.toggle("swap-layout");
+    let isSwapped = container.classList.contains("swap-layout");
+    localStorage.setItem("bj_layout_pref", isSwapped ? "swapped" : "default");
+  }
+
+  function loadLayoutPref() {
+    let pref = localStorage.getItem("bj_layout_pref");
+    let container = document.getElementById("mainLayoutContainer");
+    if (pref === "swapped" && container) {
+      container.classList.add("swap-layout");
+    }
+  }
+
+  /* 📊 開啟 EV 快選彈窗 */
+  function openEvModal() {
+    triggerVibrate();
+    let box = document.getElementById("evOptionsBox");
+    let title = document.getElementById("evModalTitle");
+    
+    if (config.platform === 'SA') {
+      title.innerText = "SA 模式 EV 快選";
+      box.innerHTML = `
+        <button type="button" class="login-btn" style="background:#1B2533; border:1px solid var(--accent-blue); color:#FFF; font-size:0.9rem; padding:8px 10px;" onclick="selectEvValue(-0.51)">⚡ -0.51%</button>
+        <button type="button" class="login-btn" style="background:#1B2533; border:1px solid var(--accent-blue); color:#FFF; font-size:0.9rem; padding:8px 10px;" onclick="selectEvValue(-0.53)">⚡ -0.53%</button>
+        <button type="button" class="login-btn" style="background:#1B2533; border:1px solid var(--accent-blue); color:#FFF; font-size:0.9rem; padding:8px 10px;" onclick="selectEvValue(-0.55)">⚡ -0.55%</button>
+        <button type="button" class="login-btn" style="background:#1B2533; border:1px solid var(--accent-blue); color:#FFF; font-size:0.9rem; padding:8px 10px;" onclick="selectEvValue(-0.58)">⚡ -0.58%</button>
+        <button type="button" class="login-btn" style="background:#1B2533; border:1px solid var(--accent-blue); color:#FFF; font-size:0.9rem; padding:8px 10px;" onclick="selectEvValue(-0.60)">⚡ -0.60%</button>
+      `;
+    } else {
+      title.innerText = "DB 模式 EV 快選";
+      box.innerHTML = `
+        <button type="button" class="login-btn" style="background:#1B2533; border:1px solid var(--accent-blue); color:#FFF; font-size:0.9rem; padding:8px 10px;" onclick="selectEvValue(-0.68)">⚡ -0.68%</button>
+      `;
+    }
+    document.getElementById("evModalOverlay").style.display = "flex";
+  }
+
+  function closeEvModal() {
+    document.getElementById("evModalOverlay").style.display = "none";
+  }
+
+  function selectEvValue(val) {
+    triggerVibrate();
+    let oldEV = config.baseEV;
+    config.baseEV = val;
+    document.getElementById("cfgBaseEV").value = val;
+    let auditMsg = (oldEV !== val) ? `修改了標準 EV（${oldEV}% ➔ ${val}%）` : "";
+    saveGameState(!!auditMsg, auditMsg);
+    updateUI(false, true);
+    closeEvModal();
+  }
+
+  function applyCustomEv() {
+    triggerVibrate();
+    let val = parseFloat(document.getElementById("txtCustomEV").value);
+    if (!isNaN(val)) {
+      selectEvValue(val);
+      document.getElementById("txtCustomEV").value = "";
+    }
+  }
+
+  /* 🔄 記錄牌局網格點擊修改／刪除視窗 */
+  function openHistoryCardModal(index) {
+    triggerVibrate();
+    let item = historyStack[index];
+    if (!item) return;
+
+    if (currentMode === 'shoe' && item.isDealer) {
+      updateLastTapBanner("⚠️ 請先切至「莊家」模式再修改紅色莊家牌", "dealer");
+      return;
+    }
+    if (currentMode === 'dealer' && !item.isDealer) {
+      updateLastTapBanner("⚠️ 請先切至「閒家」模式再修改藍色閒家牌", "player");
+      return;
+    }
+
+    editingHistoryCardIndex = index;
+    let roleName = item.isDealer ? "莊家牌" : (item.isBurn ? "銷牌" : "閒家牌");
+    document.getElementById("historyModalSubtitle").innerText = `第 ${index + 1} 張 ${roleName} [${item.label}] ➔ 點擊下方替換`;
+    document.getElementById("historyCardModalOverlay").style.display = "flex";
+  }
+
+  function closeHistoryCardModal() {
+    document.getElementById("historyCardModalOverlay").style.display = "none";
+    editingHistoryCardIndex = -1;
+  }
+
+  function applyHistoryCardReplacement(newVal) {
+    triggerVibrate();
+    if (editingHistoryCardIndex < 0 || editingHistoryCardIndex >= historyStack.length) return;
+    let idx = editingHistoryCardIndex;
+    let oldItem = historyStack[idx];
+    let oldVal = oldItem.value;
+    let oldLabel = oldItem.label;
+    let isDealer = !!oldItem.isDealer;
+    let newLabel = newVal === 1 ? "A" : (newVal === 10 ? "10" : newVal.toString());
+    let newWeight = (newVal >= 2 && newVal <= 6) ? 1 : ((newVal >= 7 && newVal <= 9) ? 0 : -1);
+
+    historyStack[idx] = {
+      weight: newWeight,
+      label: newLabel,
+      value: newVal,
+      isBurn: false,
+      isDealer: isDealer
+    };
+
+    if (isDealer && oldVal !== undefined) {
+      let syncedDealer = false;
+      for (let i = currentDealerCards.length - 1; i >= 0; i--) {
+        if (currentDealerCards[i].val === oldVal) {
+          currentDealerCards[i] = { val: newVal, label: newLabel };
+          syncedDealer = true;
+          break;
+        }
+      }
+      if (!syncedDealer) {
+        for (let r = 0; r < dealerHistoryRounds.length; r++) {
+          let round = dealerHistoryRounds[r];
+          for (let c = round.cards.length - 1; c >= 0; c--) {
+            if (round.cards[c].val === oldVal) {
+              round.cards[c] = { val: newVal, label: newLabel };
+              round.sum = getDealerHandSum(round.cards);
+              syncedDealer = true;
+              break;
+            }
+          }
+          if (syncedDealer) break;
+        }
+      }
+      updateDealerDisplay();
+    }
+
+    let auditMsg = `將第 ${idx + 1} 張 [${oldLabel}] 改為 [${newLabel}]`;
+    updateLastTapBanner(`🔄 第 ${idx + 1} 張改為 [${newLabel}]`, isDealer ? 'dealer' : 'player');
+    saveGameState(true, auditMsg);
+    updateUI(false, true);
+    closeHistoryCardModal();
+  }
+
+  function deleteHistoryCard() {
+    triggerVibrate();
+    if (editingHistoryCardIndex < 0 || editingHistoryCardIndex >= historyStack.length) return;
+    let idx = editingHistoryCardIndex;
+    let removed = historyStack.splice(idx, 1)[0];
+
+    if (removed && removed.isDealer && removed.value !== undefined) {
+      let removedFromDealer = false;
+      for (let i = currentDealerCards.length - 1; i >= 0; i--) {
+        if (currentDealerCards[i].val === removed.value) {
+          currentDealerCards.splice(i, 1);
+          removedFromDealer = true;
+          break;
+        }
+      }
+      if (!removedFromDealer) {
+        for (let r = 0; r < dealerHistoryRounds.length; r++) {
+          let round = dealerHistoryRounds[r];
+          for (let c = round.cards.length - 1; c >= 0; c--) {
+            if (round.cards[c].val === removed.value) {
+              round.cards.splice(c, 1);
+              if (round.cards.length === 0) {
+                dealerHistoryRounds.splice(r, 1);
+              } else {
+                round.sum = getDealerHandSum(round.cards);
+              }
+              removedFromDealer = true;
+              break;
+            }
+          }
+          if (removedFromDealer) break;
+        }
+      }
+      updateDealerDisplay();
+    }
+
+    let auditMsg = `刪除了第 ${idx + 1} 張 [${removed.label}]`;
+    updateLastTapBanner(`🗑️ 已刪除 [${removed.label}]（剩 ${historyStack.length} 張）`, removed.isDealer ? 'dealer' : 'player');
+    saveGameState(true, auditMsg);
+    updateUI(false, true);
+    closeHistoryCardModal();
+  }
+
+  /* 🔄 莊家牌點數圖形化彈窗邏輯 */
+  function openDealerCardModal(roundIndex, cardIndex, tagEl) {
+    triggerVibrate();
+    let targetRound = dealerHistoryRounds[roundIndex];
+    if (!targetRound || !targetRound.cards[cardIndex]) return;
+
+    document.querySelectorAll('.dh-tag.editing-active').forEach(el => el.classList.remove('editing-active'));
+    if (tagEl) tagEl.classList.add('editing-active');
+
+    let oldCard = targetRound.cards[cardIndex];
+    editingDealerCardTarget = { roundIndex, cardIndex, oldCard };
+
+    document.getElementById("dealerModalSubtitle").innerText = `目前莊家牌 [${oldCard.label}] ➔ 點擊下方替換`;
+    document.getElementById("dealerCardModalOverlay").style.display = "flex";
+  }
+
+  function closeDealerCardModal() {
+    document.querySelectorAll('.dh-tag.editing-active').forEach(el => el.classList.remove('editing-active'));
+    document.getElementById("dealerCardModalOverlay").style.display = "none";
+    editingDealerCardTarget = null;
+  }
+
+  function applyDealerCardReplacement(newVal) {
+    triggerVibrate();
+    if (!editingDealerCardTarget) return;
+    let { roundIndex, cardIndex, oldCard } = editingDealerCardTarget;
+    let targetRound = dealerHistoryRounds[roundIndex];
+    if (!targetRound) return;
+
+    let newLabel = newVal === 1 ? "A" : (newVal === 10 ? "10" : newVal.toString());
+
+    let foundInShoe = false;
+    for (let i = historyStack.length - 1; i >= 0; i--) {
+      if (!historyStack[i].isBurn && historyStack[i].isDealer && historyStack[i].value === oldCard.val) {
+        let weight = (newVal >= 2 && newVal <= 6) ? 1 : ((newVal >= 7 && newVal <= 9) ? 0 : -1);
+        historyStack[i] = { weight: weight, label: newLabel, value: newVal, isBurn: false, isDealer: true };
+        foundInShoe = true;
+        break;
+      }
+    }
+    if (!foundInShoe) {
+      for (let i = historyStack.length - 1; i >= 0; i--) {
+        if (!historyStack[i].isBurn && historyStack[i].value === oldCard.val) {
+          let weight = (newVal >= 2 && newVal <= 6) ? 1 : ((newVal >= 7 && newVal <= 9) ? 0 : -1);
+          historyStack[i] = { weight: weight, label: newLabel, value: newVal, isBurn: false, isDealer: true };
+          foundInShoe = true;
+          break;
+        }
+      }
+    }
+
+    if (!foundInShoe) {
+      let weight = (newVal >= 2 && newVal <= 6) ? 1 : ((newVal >= 7 && newVal <= 9) ? 0 : -1);
+      historyStack.push({ weight: weight, label: newLabel, value: newVal, isBurn: false, isDealer: true });
+    }
+
+    targetRound.cards[cardIndex] = { val: newVal, label: newLabel };
+    targetRound.sum = getDealerHandSum(targetRound.cards);
+
+    let auditMsg = `將莊家牌 [${oldCard.label}] 改為 [${newLabel}]`;
+    updateLastTapBanner(`🔄 莊家牌改為 [${newLabel}]`, 'dealer');
+    saveGameState(true, auditMsg);
+    updateDealerDisplay();
+    updateUI(false, true);
+    closeDealerCardModal();
+  }
+
+  function deleteDealerHistoryCard() {
+    triggerVibrate();
+    if (!editingDealerCardTarget) return;
+    let { roundIndex, cardIndex, oldCard } = editingDealerCardTarget;
+    let targetRound = dealerHistoryRounds[roundIndex];
+    if (!targetRound) return;
+
+    targetRound.cards.splice(cardIndex, 1);
+
+    let removed = false;
+    for (let i = historyStack.length - 1; i >= 0; i--) {
+      if (!historyStack[i].isBurn && historyStack[i].isDealer && historyStack[i].value === oldCard.val) {
+        historyStack.splice(i, 1);
+        removed = true;
+        break;
+      }
+    }
+    if (!removed) {
+      for (let i = historyStack.length - 1; i >= 0; i--) {
+        if (!historyStack[i].isBurn && historyStack[i].value === oldCard.val) {
+          historyStack.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    if (targetRound.cards.length === 0) {
+      dealerHistoryRounds.splice(roundIndex, 1);
+    } else {
+      targetRound.sum = getDealerHandSum(targetRound.cards);
+    }
+
+    let auditMsg = `刪除了莊家牌 [${oldCard.label}]`;
+    updateLastTapBanner(`🗑️ 已刪除莊家牌 [${oldCard.label}]`, 'dealer');
+    saveGameState(true, auditMsg);
+    updateDealerDisplay();
+    updateUI(false, true);
+    closeDealerCardModal();
+  }
+
+  function toggleTheme() {
+    triggerVibrate();
+    let body = document.body;
+    body.classList.toggle("theme-night");
+    let isNight = body.classList.contains("theme-night");
+    localStorage.setItem("bj_theme_pref", isNight ? "night" : "warm");
+  }
+
+  function loadThemePref() {
+    let pref = localStorage.getItem("bj_theme_pref");
+    if (pref === "night") {
+      document.body.classList.add("theme-night");
+    }
+  }
+
+  /* 📡 獨立切換「雙機接力」面板（自動收合臨時碼面板） */
+  function toggleSyncPanel() {
+    triggerVibrate();
+    let p = document.getElementById("syncPanel");
+    let m = document.getElementById("masterCodePanel");
+    if (m) m.classList.remove("active");
+    p.classList.toggle("active");
+  }
+
+  /* 🔑 獨立切換「臨時碼與雷達」面板（僅限主帳號，自動收合雙機接力面板） */
+  function toggleMasterCodesPanel() {
+    triggerVibrate();
+    if (authRole !== "master") return;
+    let m = document.getElementById("masterCodePanel");
+    let p = document.getElementById("syncPanel");
+    if (p) p.classList.remove("active");
+    m.classList.toggle("active");
+    if (m.classList.contains("active")) {
+      renderMasterTempCodes();
+      renderRadar();
+    }
+  }
+
+  function savePreShuffleSnapshot() {
+    if (historyStack.length === 0 && currentDealerCards.length === 0 && dealerHistoryRounds.length === 0) return;
+    lastShoeSnapshot = {
+      historyStack: JSON.parse(JSON.stringify(historyStack)),
+      currentDealerCards: JSON.parse(JSON.stringify(currentDealerCards)),
+      dealerHistoryRounds: JSON.parse(JSON.stringify(dealerHistoryRounds)),
+      config: JSON.parse(JSON.stringify(config)),
+      ts: Date.now()
+    };
+    if (shoeBackupTimer) clearTimeout(shoeBackupTimer);
+    shoeBackupTimer = setTimeout(() => {
+      lastShoeSnapshot = null;
+      let btn = document.querySelector(".btn-undo-shuffle");
+      if (btn) btn.remove();
+    }, 15000);
+  }
+
+  function initMqtt(topicCode, isInitialCreate = false) {
+    let statusEl = document.getElementById("syncStatus");
+    statusEl.innerText = "⏳ 連線中...";
+
+    if (mqttClient) {
+      try { mqttClient.end(true); } catch(e) {}
+    }
+
+    mqttClient = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+      clientId: myClientId + "_" + Math.random().toString(36).substr(2, 4),
+      keepalive: 20,
+      reconnectPeriod: 2000,
+      connectTimeout: 10000,
+      clean: true
+    });
+
+    mqttClient.on('connect', () => {
+      currentRoomTopic = "bj_relay_v6_" + topicCode;
+      mqttClient.subscribe(currentRoomTopic, { qos: 1 }, (err) => {
+        if (!err) {
+          updateSyncStatusBadge("(已連線)");
+
+          if (isInitialCreate && (historyStack.length > 0 || currentDealerCards.length > 0 || dealerHistoryRounds.length > 0)) {
+            broadcastState("");
+            isInitialCreate = false;
+          }
+          mqttClient.publish(currentRoomTopic, JSON.stringify({ type: 'REQ_STATE', senderId: myClientId }));
+        }
+      });
+    });
+
+    mqttClient.on('reconnect', () => {
+      statusEl.innerText = "🟡 斷線重連中...";
+    });
+
+    mqttClient.on('offline', () => {
+      statusEl.innerText = "🟠 網路離線，等待恢復...";
+    });
+
+    mqttClient.on('message', (t, message) => {
+      try {
+        let data = JSON.parse(message.toString());
+        if (!data) return;
+
+        if (data.senderId === myClientId) return;
+
+        if (data.type === 'REQ_STATE') {
+          if (historyStack.length > 0 || currentDealerCards.length > 0 || dealerHistoryRounds.length > 0) {
+            broadcastState("");
+          }
+        } else if (data.type === 'RELAY_STATE') {
+          if (data.timestamp && data.timestamp < lastStateTimestamp) return;
+          if (data.timestamp) lastStateTimestamp = data.timestamp;
+
+          let incomingHistory = (data.state && Array.isArray(data.state.historyStack)) ? data.state.historyStack : [];
+          if (incomingHistory.length === 0 && historyStack.length > 0) {
+            savePreShuffleSnapshot();
+          }
+
+          isRemoteUpdating = true;
+          
+          historyStack = incomingHistory;
+          currentDealerCards = data.state.currentDealerCards || [];
+          dealerHistoryRounds = data.state.dealerHistoryRounds || [];
+          if (data.state.config) {
+            config.bankroll = data.state.config.bankroll || 0;
+            config.rebate = (data.state.config.rebate !== undefined) ? data.state.config.rebate : 0;
+            config.baseEV = (data.state.config.baseEV !== undefined) ? data.state.config.baseEV : -0.53;
+            let incomingRoom = data.state.config.tableRoomId || "Ｄ廳";
+            config.tableRoomId = VALID_ROOMS.includes(incomingRoom) ? incomingRoom : "Ｄ廳";
+            config.platform = data.state.config.platform || "SA";
+            
+            let bInput = document.getElementById("cfgBankroll");
+            if (bInput && document.activeElement !== bInput) bInput.value = config.bankroll ? config.bankroll : "";
+            let rInput = document.getElementById("cfgRebate");
+            if (rInput && document.activeElement !== rInput) rInput.value = config.rebate ? config.rebate : "";
+            let evInput = document.getElementById("cfgBaseEV");
+            if (evInput && document.activeElement !== evInput) evInput.value = config.baseEV;
+            let trInput = document.getElementById("cfgTableRoomId");
+            if (trInput && document.activeElement !== trInput) trInput.value = config.tableRoomId;
+            
+            applyPlatformUIOnly(config.platform);
+          }
+          
+          updateDealerDisplay();
+          updateUI(false, true);
+
+          if (data.auditAction) {
+            let who = data.actor || "對方";
+            showTamperAlert(`${who} ${data.auditAction}`);
+            updateSyncStatusBadge(`🚨 ${who}異動`);
+            if (historyStack.length === 0 && lastShoeSnapshot) {
+              updateLastTapBanner(`⚠️ ${who} 已清空洗牌`, "");
+            }
+          } else {
+            updateSyncStatusBadge("⬇");
+          }
+
+          let st = {
+            historyStack: historyStack,
+            currentDealerCards: currentDealerCards,
+            dealerHistoryRounds: dealerHistoryRounds,
+            bankroll: config.bankroll,
+            rebate: config.rebate,
+            baseEV: config.baseEV,
+            tableRoomId: config.tableRoomId,
+            platform: config.platform,
+            activeRoomCode: activeRoomCode,
+            isRoomHost: isRoomHost
+          };
+          localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(st));
+
+          isRemoteUpdating = false;
+        }
+      } catch(e) {}
+    });
+
+    mqttClient.on('error', () => { statusEl.innerText = "🔴 連線失敗，重試中..."; });
+  }
+
+  function createRoom() {
+    triggerVibrate();
+    let randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+    activeRoomCode = randomCode;
+    isRoomHost = true;
+    document.getElementById("txtRoomId").value = randomCode;
+    saveGameState();
+    initMqtt(randomCode, true);
+  }
+
+  function joinRoom() {
+    triggerVibrate();
+    let inputCode = document.getElementById("txtRoomId").value.trim();
+    if (!inputCode || inputCode.length !== 4) { alert("請輸入 4 位數正確房號！"); return; }
+    activeRoomCode = inputCode;
+    isRoomHost = false;
+    lastStateTimestamp = 0;
+    saveGameState();
+    initMqtt(inputCode, false);
+  }
+
+  function forceSyncNow() {
+    triggerVibrate();
+    if (!activeRoomCode) {
+      alert("⚠️ 請先點選「➕ 創房」或輸入房號「🔗 加入」！");
+      return;
+    }
+    let statusEl = document.getElementById("syncStatus");
+    statusEl.innerText = "⏳ 純補抓最新進度中...";
+    lastStateTimestamp = 0;
+
+    if (mqttClient && mqttClient.connected && currentRoomTopic) {
+      mqttClient.unsubscribe(currentRoomTopic, () => {
+        mqttClient.subscribe(currentRoomTopic, { qos: 1 }, () => {
+          mqttClient.publish(currentRoomTopic, JSON.stringify({ type: 'REQ_STATE', senderId: myClientId }));
+          updateSyncStatusBadge("🔄 已發送補抓");
+        });
+      });
+    } else {
+      initMqtt(activeRoomCode, false);
+    }
+  }
+
+  function broadcastState(auditAction = "") {
+    if (mqttClient && mqttClient.connected && currentRoomTopic && !isRemoteUpdating) {
+      let nowTs = Date.now();
+      lastStateTimestamp = nowTs;
+      let actionNote = auditAction || pendingAuditAction || "";
+      pendingAuditAction = "";
+      mqttClient.publish(currentRoomTopic, JSON.stringify({
+        type: 'RELAY_STATE',
+        senderId: myClientId,
+        actor: getActorLabel(),
+        auditAction: actionNote,
+        timestamp: nowTs,
+        state: {
+          historyStack: historyStack,
+          currentDealerCards: currentDealerCards,
+          dealerHistoryRounds: dealerHistoryRounds,
+          config: config
+        }
+      }), { qos: 1, retain: true });
+      updateSyncStatusBadge("⬆");
+    }
+  }
+
+  /* 🎫 依版本指紋＋批次編號演算固定 12 組 (3×4) 臨時通行碼（每次更新程式碼自動換新密碼池） */
+  function getCodesForBatch(batchIdx) {
+    let codes = [];
+    let slot = 0;
+    let secret = _getMasterSecret();
+    while (codes.length < 12) {
+      let hash = 2166136261;
+      let str = `${secret}_${APP_BUILD_ID}_batch_${batchIdx}_slot_${slot}`;
+      for (let j = 0; j < str.length; j++) {
+        hash ^= str.charCodeAt(j);
+        hash = Math.imul(hash, 16777619);
+      }
+      let codeStr = String(Math.abs(hash) % 900000 + 100000);
+      if (!codes.includes(codeStr)) {
+        codes.push(codeStr);
+      }
+      slot++;
+    }
+    return codes;
+  }
+
+  function saveStoredAuthMeta() {
+    localStorage.setItem("bj_batch_auth_meta_v10", JSON.stringify({
+      buildId: APP_BUILD_ID,
+      batchIndex: currentBatchIndex,
+      revokedCodes: revokedTempCodes,
+      claimedCodes: claimedCodes,
+      nicknames: codeNicknames,
+      ts: batchUpdatedTs
+    }));
+  }
+
+  function loadStoredAuthMeta() {
+    let isNewBuildDeploy = false;
+    try {
+      let savedBuild = localStorage.getItem("bj_app_build_id");
+      if (savedBuild !== APP_BUILD_ID) {
+        isNewBuildDeploy = true;
+        localStorage.setItem("bj_app_build_id", APP_BUILD_ID);
+      }
+      let raw = localStorage.getItem("bj_batch_auth_meta_v10");
+      if (raw) {
+        let parsed = JSON.parse(raw);
+        if (typeof parsed.batchIndex === "number" && parsed.batchIndex >= 1) {
+          currentBatchIndex = parsed.batchIndex;
+        }
+        if (!isNewBuildDeploy && parsed.buildId === APP_BUILD_ID) {
+          if (Array.isArray(parsed.revokedCodes)) {
+            revokedTempCodes = parsed.revokedCodes;
+          }
+          if (parsed.claimedCodes && typeof parsed.claimedCodes === "object") {
+            claimedCodes = parsed.claimedCodes;
+          }
+          if (parsed.nicknames && typeof parsed.nicknames === "object") {
+            codeNicknames = parsed.nicknames;
+          }
+          if (typeof parsed.ts === "number") {
+            batchUpdatedTs = parsed.ts;
+          }
+        }
+      }
+    } catch (e) {}
+
+    if (isNewBuildDeploy) {
+      currentBatchIndex = Math.max(2, currentBatchIndex + 1);
+      revokedTempCodes = [];
+      claimedCodes = {};
+      codeNicknames = {};
+      batchUpdatedTs = Date.now();
+      saveStoredAuthMeta();
+    }
+    activeTempCodes = getCodesForBatch(currentBatchIndex);
+  }
+
+  function publishAuthPool(isMasterOverride = false) {
+    if (radarClient && radarClient.connected) {
+      radarClient.publish(AUTH_SYNC_TOPIC, JSON.stringify({
+        type: "BATCH_UPDATE",
+        senderId: myClientId,
+        buildId: APP_BUILD_ID,
+        isMasterOverride: !!isMasterOverride,
+        batchIndex: currentBatchIndex,
+        revokedCodes: revokedTempCodes,
+        claimedCodes: claimedCodes,
+        nicknames: codeNicknames,
+        ts: batchUpdatedTs
+      }), { qos: 1, retain: true });
+
+      // 🛡️ 主機登入新版時，同步向舊版頻道廣播作廢令，強制踢出所有未更新的舊網頁
+      if (authRole === "master" && isMasterOverride) {
+        LEGACY_AUTH_TOPICS.forEach(legacyTopic => {
+          radarClient.publish(legacyTopic, JSON.stringify({
+            type: "BATCH_UPDATE",
+            senderId: myClientId,
+            buildId: APP_BUILD_ID,
+            isMasterOverride: true,
+            batchIndex: 999999,
+            revokedCodes: [],
+            claimedCodes: {},
+            ts: Date.now()
+          }), { qos: 1, retain: true });
+        });
+      }
+    }
+  }
+
+  /* 🟢 連接背景認證同步、版本強制重啟令與 3×4 訪客在線雷達 */
+  function initAuthAndRadar() {
+    if (radarClient) return;
+    radarClient = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+      clientId: "rad_" + myClientId,
+      keepalive: 20,
+      reconnectPeriod: 2000,
+      clean: true
+    });
+
+    radarClient.on("connect", () => {
+      let subTopics = [AUTH_SYNC_TOPIC, RADAR_TOPIC, ...LEGACY_RADAR_TOPICS, getLegacyV12RadarTopic()];
+      radarClient.subscribe(subTopics, { qos: 1 }, () => {
+        if (authRole === "master" && batchUpdatedTs > 0) {
+          publishAuthPool(true);
+        }
+        if (authRole === "guest" && authCode) {
+          radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "HB", code: authCode, clientId: myClientId, buildId: APP_BUILD_ID }), { qos: 1 });
+        }
+      });
+    });
+
+    radarClient.on("message", (t, msg) => {
+      try {
+        let d = JSON.parse(msg.toString());
+        if (!d) return;
+
+        // 🛡️ 攔截舊版網頁 (v8/v9/v12) 訪客心跳並立即強制踢除重整
+        if (authRole === "master" && (LEGACY_RADAR_TOPICS.includes(t) || t === getLegacyV12RadarTopic()) && d.type === "HB" && d.code) {
+          radarClient.publish(t, JSON.stringify({ type: "KICK", target: d.code, targetClientId: d.clientId || "" }), { qos: 1 });
+          return;
+        }
+
+        if (t === AUTH_SYNC_TOPIC && d.type === "BATCH_UPDATE") {
+          // 🚀 若偵測到主機已部署更新版本（不同 buildId），所有舊網頁 0.5 秒內強制登出重載！
+          if (d.buildId && d.buildId !== APP_BUILD_ID && d.senderId !== myClientId) {
+            localStorage.setItem("bj_app_build_id", d.buildId);
+            if (authRole !== null) {
+              alert("⚠️ 系統已更新至最新版本，請重新登入並向主機索取新密碼！");
+            }
+            location.reload();
+            return;
+          }
+
+          hasReceivedCloudAuth = true;
+          if (typeof d.batchIndex === "number" && d.batchIndex >= 1) {
+            let incomingTs = d.ts || 0;
+            let incomingRevoked = Array.isArray(d.revokedCodes) ? d.revokedCodes : [];
+            let incomingClaimed = (d.claimedCodes && typeof d.claimedCodes === "object") ? d.claimedCodes : {};
+            let incomingNicks = (d.nicknames && typeof d.nicknames === "object") ? d.nicknames : {};
+
+            if (d.batchIndex > currentBatchIndex) {
+              currentBatchIndex = d.batchIndex;
+              revokedTempCodes = incomingRevoked;
+              claimedCodes = incomingClaimed;
+              codeNicknames = incomingNicks;
+              batchUpdatedTs = incomingTs;
+              activeTempCodes = getCodesForBatch(currentBatchIndex);
+              saveStoredAuthMeta();
+
+              if (authRole === "master") {
+                activeGuests = {};
+                renderMasterTempCodes();
+                renderRadar();
+              } else if (authRole === "guest" && authCode) {
+                alert("⚠️ 主機已切換新批次，此臨時密碼已失效！");
+                location.reload();
+                return;
+              }
+            } else if (d.batchIndex === currentBatchIndex) {
+              if (d.isMasterOverride && incomingTs >= batchUpdatedTs) {
+                revokedTempCodes = incomingRevoked;
+                claimedCodes = incomingClaimed;
+                codeNicknames = incomingNicks;
+                batchUpdatedTs = incomingTs;
+              } else {
+                incomingRevoked.forEach(c => {
+                  if (!revokedTempCodes.includes(c)) revokedTempCodes.push(c);
+                });
+                for (let c in incomingClaimed) {
+                  let inc = incomingClaimed[c];
+                  if (!inc || !inc.clientId) continue;
+                  let cur = claimedCodes[c];
+                  if (!cur) {
+                    claimedCodes[c] = inc;
+                  } else {
+                    let curTs = cur.ts || 0;
+                    let incTs = inc.ts || 0;
+                    if (incTs < curTs || (incTs === curTs && inc.clientId < cur.clientId)) {
+                      claimedCodes[c] = inc;
+                    }
+                  }
+                }
+                if (incomingTs >= batchUpdatedTs) {
+                  codeNicknames = incomingNicks;
+                  batchUpdatedTs = incomingTs;
+                }
+              }
+
+              activeTempCodes = getCodesForBatch(currentBatchIndex);
+              saveStoredAuthMeta();
+
+              if (authRole === "master") {
+                renderMasterTempCodes();
+                renderRadar();
+              } else if (authRole === "guest" && authCode) {
+                let claimInfo = claimedCodes[authCode];
+                if (!activeTempCodes.includes(authCode) || revokedTempCodes.includes(authCode)) {
+                  alert("⚠️ 主機已作廢此臨時密碼，請重新跟主機索取新密碼！");
+                  location.reload();
+                  return;
+                }
+                if (claimInfo && claimInfo.clientId && claimInfo.clientId !== myClientId) {
+                  alert("⚠️ 此臨時通行碼已被其他裝置登入使用！");
+                  location.reload();
+                  return;
+                }
+              }
+            }
+          }
+
+          if (pendingGuestVerify) {
+            let fn = pendingGuestVerify;
+            pendingGuestVerify = null;
+            fn();
+          }
+        }
+
+        if (t === RADAR_TOPIC) {
+          if (authRole === "master" && d.type === "HB") {
+            let claimInfo = claimedCodes[d.code];
+            let isWrongOwner = claimInfo && claimInfo.clientId && d.clientId && claimInfo.clientId !== d.clientId;
+            let isOldBuild = d.buildId && d.buildId !== APP_BUILD_ID;
+            if (revokedTempCodes.includes(d.code) || !activeTempCodes.includes(d.code) || isWrongOwner || isOldBuild) {
+              radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "KICK", target: d.code, targetClientId: d.clientId || "" }), { qos: 1 });
+            } else {
+              if (!claimedCodes[d.code]) {
+                claimedCodes[d.code] = { clientId: d.clientId || ("legacy_" + d.code), ts: Date.now() };
+                batchUpdatedTs = Date.now();
+                saveStoredAuthMeta();
+                publishAuthPool(false);
+              }
+              let prevStatus = activeGuests[d.code] ? activeGuests[d.code].status : "";
+              activeGuests[d.code] = { ts: Date.now(), status: "online" };
+              renderRadar();
+              if (prevStatus !== "online") renderMasterTempCodes();
+            }
+          }
+          if (authRole === "guest" && d.type === "KICK" && d.target === authCode) {
+            if (!d.targetClientId || d.targetClientId === myClientId) {
+              alert("⚠️ 您已被主機強制登出，此臨時密碼已作廢！");
+              location.reload();
+            }
+          }
+        }
+      } catch (e) {}
+    });
+  }
+
+  setInterval(() => {
+    if (authRole === "guest" && radarClient && radarClient.connected && authCode) {
+      radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "HB", code: authCode, clientId: myClientId, buildId: APP_BUILD_ID }), { qos: 1 });
+    }
+    if (authRole === "master") {
+      let now = Date.now(), changed = false;
+      for (let k in activeGuests) {
+        if (activeGuests[k].status === "online" && now - activeGuests[k].ts > 6000) {
+          activeGuests[k].status = "offline";
+          changed = true;
+        }
+      }
+      if (changed) {
+        renderRadar();
+        renderMasterTempCodes();
+      }
+    }
+  }, 3000);
+
+  function getSlotDisplayLabel(codeStr) {
+    let idx = activeTempCodes.indexOf(codeStr);
+    let slotTag = idx !== -1 ? `#${idx + 1}` : "";
+    let nick = (codeNicknames[codeStr] || "").trim();
+    if (nick) {
+      return `${slotTag ? slotTag + ' ' : ''}${nick} [${codeStr}]`;
+    }
+    return `${slotTag ? slotTag + ' ' : ''}[${codeStr}]`;
+  }
+
+  function renderRadar() {
+    let box = document.getElementById("guestRadarBox");
+    if (!box) return;
+    let keys = Object.keys(activeGuests);
+    if (keys.length === 0) {
+      box.innerHTML = `<div style="grid-column: span 3; font-size:0.62rem; color:var(--text-sub); text-align:center;">目前無訪客在線</div>`;
+      return;
+    }
+    keys.sort((a, b) => {
+      let ia = activeTempCodes.indexOf(a);
+      let ib = activeTempCodes.indexOf(b);
+      if (ia === -1) ia = 999;
+      if (ib === -1) ib = 999;
+      return ia - ib;
+    });
+    box.innerHTML = keys.map(k => {
+      let isOn = activeGuests[k].status === "online";
+      let idx = activeTempCodes.indexOf(k);
+      let slotPrefix = idx !== -1 ? `#${idx + 1}` : "";
+      let nick = (codeNicknames[k] || "").trim();
+      let titleText = nick ? `${slotPrefix} ${nick}` : `${slotPrefix || '訪客'}`;
+      return `<div class="radar-row">
+        <div class="radar-row-top">
+          <span class="radar-user-label" style="color:${isOn ? 'var(--accent-green)' : 'var(--text-sub)'};" title="${titleText} [${k}]">${isOn ? '🟢' : '🔴'} ${titleText}</span>
+          <button type="button" class="btn-kick" onclick="kickUser('${k}')">❌</button>
+        </div>
+        <div style="font-family:monospace; font-size:0.6rem; color:${isOn ? '#E2E8F0' : '#64748B'}; font-weight:bold;">${k}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function kickUser(code) {
+    triggerVibrate();
+    let label = getSlotDisplayLabel(code);
+    if (!confirm(`確定要踢除訪客 ${label} 並作廢此密碼嗎？`)) return;
+    if (!revokedTempCodes.includes(code)) revokedTempCodes.push(code);
+    batchUpdatedTs = Date.now();
+    saveStoredAuthMeta();
+    publishAuthPool(true);
+    if (radarClient && radarClient.connected) {
+      radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "KICK", target: code }), { qos: 1 });
+    }
+    delete activeGuests[code];
+    renderMasterTempCodes();
+    renderRadar();
+  }
+
+  function setTempNickname(codeStr, val, isTyping = false) {
+    let cleanVal = String(val || "").slice(0, 12);
+    if (cleanVal.trim()) {
+      codeNicknames[codeStr] = cleanVal;
+    } else {
+      delete codeNicknames[codeStr];
+    }
+    batchUpdatedTs = Date.now();
+    saveStoredAuthMeta();
+    renderRadar();
+
+    if (nickSyncTimer) clearTimeout(nickSyncTimer);
+    if (isTyping) {
+      nickSyncTimer = setTimeout(() => {
+        publishAuthPool(true);
+      }, 450);
+    } else {
+      publishAuthPool(true);
+    }
+  }
+
+  function escapeHtmlAttr(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  /* 🔑 僅限主帳號登入後渲染 12 組 (3×4) 動態臨時碼＋暱稱輸入框（一碼一用，登入即自動畫刪除線作廢） */
+  function renderMasterTempCodes() {
+    if (authRole !== "master") return;
+    activeTempCodes = getCodesForBatch(currentBatchIndex);
+    let titleEl = document.getElementById("tempBatchTitle");
+    if (titleEl) {
+      titleEl.innerText = "🎫 12 組臨時通行碼";
+    }
+    let gridEl = document.getElementById("tempCodesGrid");
+    if (!gridEl) return;
+
+    // 若使用者正在某個暱稱輸入框打字，保留焦點避免中斷中文選字
+    let activeEl = document.activeElement;
+    if (activeEl && activeEl.classList && activeEl.classList.contains("temp-nick-input")) {
+      activeTempCodes.forEach(codeStr => {
+        let itemEl = gridEl.querySelector(`[data-code="${codeStr}"]`);
+        if (!itemEl) return;
+        let isUsedOrRevoked = revokedTempCodes.includes(codeStr) || !!claimedCodes[codeStr];
+        let isOnline = activeGuests[codeStr] && activeGuests[codeStr].status === "online";
+        itemEl.className = "temp-code-item " + (isUsedOrRevoked ? "revoked" : (isOnline ? "online-now" : ""));
+        let stEl = itemEl.querySelector(".temp-code-status");
+        if (stEl) stEl.innerText = isUsedOrRevoked ? "作廢" : (isOnline ? "在線" : "可用");
+      });
+      return;
+    }
+
+    gridEl.innerHTML = activeTempCodes.map((codeStr, idx) => {
+      let isUsedOrRevoked = revokedTempCodes.includes(codeStr) || !!claimedCodes[codeStr];
+      let isOnline = activeGuests[codeStr] && activeGuests[codeStr].status === "online";
+      let itemClass = isUsedOrRevoked ? "revoked" : (isOnline ? "online-now" : "");
+      let statusLabel = isUsedOrRevoked ? "作廢" : (isOnline ? "在線" : "可用");
+      let nickVal = escapeHtmlAttr(codeNicknames[codeStr] || "");
+      return `
+      <div class="temp-code-item ${itemClass}" data-code="${codeStr}" onclick="copyTempCode('${codeStr}', ${idx + 1})" title="點擊複製此臨時通行碼">
+        <div class="temp-code-top">
+          <span class="temp-code-num">#${idx + 1}:${codeStr}</span>
+          <span class="temp-code-status" onclick="event.stopPropagation(); toggleCodeRevoked('${codeStr}')">${statusLabel}</span>
+        </div>
+        <input type="text" class="temp-nick-input" placeholder="輸入暱稱" maxlength="10" value="${nickVal}" onclick="event.stopPropagation()" oninput="setTempNickname('${codeStr}', this.value, true)" onchange="setTempNickname('${codeStr}', this.value, false)">
+      </div>`;
+    }).join("");
+  }
+
+  function generateNextBatch() {
+    triggerVibrate();
+    if (!confirm("確定要換一批全新的 12 組臨時密碼嗎？（舊批次密碼將全部作廢）")) return;
+    let oldCodes = [...activeTempCodes];
+    currentBatchIndex += 1;
+    revokedTempCodes = [];
+    claimedCodes = {};
+    codeNicknames = {};
+    batchUpdatedTs = Date.now();
+    activeTempCodes = getCodesForBatch(currentBatchIndex);
+    saveStoredAuthMeta();
+    publishAuthPool(true);
+
+    if (radarClient && radarClient.connected) {
+      oldCodes.forEach(c => {
+        radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "KICK", target: c }), { qos: 1 });
+      });
+    }
+    activeGuests = {};
+    renderMasterTempCodes();
+    renderRadar();
+  }
+
+  function copyTempCode(codeStr, numIdx) {
+    triggerVibrate();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(codeStr).catch(() => {});
+    }
+    let notice = document.getElementById("tempCopyNotice");
+    let nick = (codeNicknames[codeStr] || "").trim();
+    if (notice) {
+      notice.innerText = nick ? `✅ 已複製 #${numIdx} ${nick} (${codeStr})` : `✅ 已複製 #${numIdx} (${codeStr})`;
+      notice.style.color = "var(--accent-green)";
+      setTimeout(() => {
+        notice.innerText = "點號碼複製";
+        notice.style.color = "var(--text-sub)";
+      }, 2500);
+    }
+  }
+
+  function toggleCodeRevoked(codeStr) {
+    triggerVibrate();
+    let isCurrentlyInvalid = revokedTempCodes.includes(codeStr) || !!claimedCodes[codeStr];
+    if (!isCurrentlyInvalid) {
+      revokedTempCodes.push(codeStr);
+      if (radarClient && radarClient.connected) {
+        radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "KICK", target: codeStr }), { qos: 1 });
+      }
+      delete activeGuests[codeStr];
+    } else {
+      let pos = revokedTempCodes.indexOf(codeStr);
+      if (pos !== -1) revokedTempCodes.splice(pos, 1);
+      delete claimedCodes[codeStr];
+      if (radarClient && radarClient.connected) {
+        radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "KICK", target: codeStr }), { qos: 1 });
+      }
+      delete activeGuests[codeStr];
+    }
+    batchUpdatedTs = Date.now();
+    saveStoredAuthMeta();
+    publishAuthPool(true);
+    renderMasterTempCodes();
+    renderRadar();
+  }
+
+  function applyRolePermissions() {
+    let btnMaster = document.getElementById("btnMasterCodes");
+    let masterPanel = document.getElementById("masterCodePanel");
+    if (authRole === "master") {
+      if (btnMaster) btnMaster.style.display = "inline-block";
+      renderMasterTempCodes();
+      renderRadar();
+    } else {
+      if (btnMaster) btnMaster.style.display = "none";
+      if (masterPanel) masterPanel.classList.remove("active");
+    }
+  }
+
+  function checkPassword() {
+    let inputEl = document.getElementById("txtPassword");
+    let btnEl = document.getElementById("btnLoginSubmit");
+    let errEl = document.getElementById("loginError");
+    let inputVal = inputEl.value.trim();
+
+    if (!inputVal) {
+      errEl.innerText = "❌ 請輸入密碼";
+      inputEl.focus();
+      return;
+    }
+
+    // 1. 主密碼登入（所有多開主帳號共享同一批次 12 組密碼，並廣播最新 buildId 強制踢出舊網頁）
+    if (_verifyMasterInput(inputVal)) {
+      authRole = "master";
+      authCode = inputVal;
+      errEl.innerText = "";
+      activeTempCodes = getCodesForBatch(currentBatchIndex);
+      if (batchUpdatedTs === 0) {
+        batchUpdatedTs = Date.now();
+        saveStoredAuthMeta();
+      }
+      publishAuthPool(true);
+      document.getElementById("loginOverlay").style.display = "none";
+      document.getElementById("appContainer").style.display = "flex";
+      applyRolePermissions();
+      initApp();
+      return;
+    }
+
+    // 2. 訪客臨時密碼登入（一碼一用：先對帳雲端最新批次與已使用名單，登入成功即自動作廢）
+    errEl.innerText = "";
+    btnEl.disabled = true;
+    btnEl.innerText = "⏳ 驗證中...";
+
+    let executeGuestCheck = () => {
+      btnEl.disabled = false;
+      btnEl.innerText = "解鎖進入";
+      activeTempCodes = getCodesForBatch(currentBatchIndex);
+
+      if (activeTempCodes.includes(inputVal)) {
+        if (revokedTempCodes.includes(inputVal) || !!claimedCodes[inputVal]) {
+          errEl.innerText = "❌ 此臨時通行碼已被使用或作廢！";
+          inputEl.value = "";
+          inputEl.focus();
+          return;
+        }
+
+        // 搶佔此臨時碼並立即同步作廢狀態給所有主機與其他裝置（一碼一用・禁止重複登入）
+        let claimTs = Date.now();
+        claimedCodes[inputVal] = { clientId: myClientId, ts: claimTs };
+        if (claimTs > batchUpdatedTs) batchUpdatedTs = claimTs;
+        saveStoredAuthMeta();
+        publishAuthPool(false);
+
+        authRole = "guest";
+        authCode = inputVal;
+        if (radarClient && radarClient.connected) {
+          radarClient.publish(RADAR_TOPIC, JSON.stringify({ type: "HB", code: authCode, clientId: myClientId, buildId: APP_BUILD_ID }), { qos: 1 });
+        }
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("appContainer").style.display = "flex";
+        applyRolePermissions();
+        initApp();
+      } else {
+        errEl.innerText = "❌ 密碼錯誤或主機已換新批次，請確認最新密碼";
+        inputEl.value = "";
+        inputEl.focus();
+      }
+    };
+
+    if (hasReceivedCloudAuth) {
+      executeGuestCheck();
+    } else {
+      let timer = setTimeout(() => {
+        if (pendingGuestVerify) {
+          pendingGuestVerify = null;
+          executeGuestCheck();
+        }
+      }, 900);
+      pendingGuestVerify = () => {
+        clearTimeout(timer);
+        executeGuestCheck();
+      };
+    }
+  }
+
+  function loadGameState() {
+    let savedState = localStorage.getItem(STATE_STORAGE_KEY);
+    if (savedState) {
+      try {
+        let st = JSON.parse(savedState);
+        historyStack = st.historyStack || [];
+        currentDealerCards = st.currentDealerCards || [];
+        dealerHistoryRounds = st.dealerHistoryRounds || [];
+        config.bankroll = st.bankroll || 0;
+        config.rebate = (st.rebate !== undefined) ? st.rebate : 0;
+        config.platform = st.platform || "SA";
+        config.baseEV = (st.baseEV !== undefined) ? st.baseEV : (config.platform === 'SA' ? -0.53 : -0.68);
+        config.tableRoomId = VALID_ROOMS.includes(st.tableRoomId) ? st.tableRoomId : "Ｄ廳";
+        activeRoomCode = st.activeRoomCode || "";
+        isRoomHost = !!st.isRoomHost;
+        
+        let bInput = document.getElementById("cfgBankroll");
+        if(bInput) bInput.value = config.bankroll ? config.bankroll : "";
+        let rInput = document.getElementById("cfgRebate");
+        if(rInput) rInput.value = config.rebate ? config.rebate : "";
+        let evInput = document.getElementById("cfgBaseEV");
+        if(evInput) evInput.value = config.baseEV;
+        let trInput = document.getElementById("cfgTableRoomId");
+        if(trInput) trInput.value = config.tableRoomId;
+
+        if (activeRoomCode) {
+          let rInputBox = document.getElementById("txtRoomId");
+          if (rInputBox) rInputBox.value = activeRoomCode;
+          initMqtt(activeRoomCode, false);
+        }
+
+        applyPlatformUIOnly(config.platform);
+      } catch(e) {}
+    } else {
+      document.getElementById("cfgBankroll").value = "";
+      document.getElementById("cfgRebate").value = "";
+      document.getElementById("cfgBaseEV").value = "-0.53";
+      document.getElementById("cfgTableRoomId").value = "Ｄ廳";
+      config.bankroll = 0; config.rebate = 0; config.baseEV = -0.53; config.tableRoomId = "Ｄ廳"; config.platform = "SA"; historyStack = []; currentDealerCards = []; dealerHistoryRounds = [];
+      applyPlatformUIOnly("SA");
+    }
+  }
+
+  function saveGameState(immediate = false, auditAction = "") {
+    if (auditAction) {
+      pendingAuditAction = auditAction;
+    }
+    let st = {
+      historyStack: historyStack,
+      currentDealerCards: currentDealerCards,
+      dealerHistoryRounds: dealerHistoryRounds,
+      bankroll: config.bankroll,
+      rebate: config.rebate,
+      baseEV: config.baseEV,
+      tableRoomId: config.tableRoomId,
+      platform: config.platform,
+      activeRoomCode: activeRoomCode,
+      isRoomHost: isRoomHost
+    };
+    localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(st));
+    
+    if (broadcastTimer) clearTimeout(broadcastTimer);
+    if (immediate) {
+      broadcastState(auditAction);
+    } else {
+      broadcastTimer = setTimeout(() => {
+        broadcastState("");
+      }, 50);
+    }
+  }
+
+  function applyPlatformUIOnly(plat) {
+    config.platform = plat;
+    let btnSA = document.getElementById("btnPlatformSA");
+    let btnDB = document.getElementById("btnPlatformDB");
+
+    if (plat === 'SA') {
+      if(btnSA) btnSA.className = "platform-tab platform-active";
+      if(btnDB) btnDB.className = "platform-tab";
+    } else {
+      if(btnSA) btnSA.className = "platform-tab";
+      if(btnDB) btnDB.className = "platform-tab platform-active";
+    }
+  }
+
+  function setPlatform(plat, autoResetEV = true) {
+    triggerVibrate();
+    let changed = (config.platform !== plat);
+    applyPlatformUIOnly(plat);
+
+    if (autoResetEV) {
+      config.baseEV = (plat === 'SA') ? -0.53 : -0.68;
+      let evInput = document.getElementById("cfgBaseEV");
+      if(evInput) evInput.value = config.baseEV;
+    }
+    
+    let auditMsg = changed ? `切換為 ${plat} 模式` : "";
+    saveGameState(!!auditMsg, auditMsg);
+    updateUI(false, true);
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    loadThemePref();
+    loadLayoutPref();
+    loadStoredAuthMeta();
+    initAuthAndRadar();
+    let pwdInput = document.getElementById("txtPassword");
+    if (pwdInput) pwdInput.focus();
+  });
+
+  function initApp() {
+    requestWakeLock();
+    loadGameState();
+    updateDealerDisplay();
+    updateUI(false, true);
+  }
+
+  function openMatrixNewTab() {
+    triggerVibrate();
+    let newWindow = window.open("", "_blank");
+    if (!newWindow) { alert("⚠️ 瀏覽器攔截了彈出視窗，請允許此網站開啟新分頁！"); return; }
+    
+    let totalCards = config.decks * 52;
+    let dealtCards = 0, runningCount = 0;
+    for (let item of historyStack) {
+      if (item.isBurn) { dealtCards += item.count; }
+      else { dealtCards += 1; runningCount += item.weight; }
+    }
+    let remCards = Math.max(0, totalCards - dealtCards);
+    let remDecks = Math.max(0.5, (remCards / 52.0));
+    let currentTC = (runningCount / remDecks).toFixed(1);
+    let initPlat = config.platform || "SA";
+
+    let safeTableTag = (config.tableRoomId || (activeRoomCode ? "房號 " + activeRoomCode : "獨立分頁")).replace(/[<>&"']/g, "");
+    let scrOpen = String.fromCharCode(60, 115, 99, 114, 105, 112, 116, 62);
+    let scrClose = String.fromCharCode(60, 47, 115, 99, 114, 105, 112, 116, 62);
+
+    let htmlContent = `<!DOCTYPE html>
+    <html lang="zh-TW">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>VIP 二十一點動態真數策略表 (${safeTableTag})</title>
+      <style>
+        :root {
+          --bg-main: #14181d;
+          --bg-card: #1f2630;
+          --text-main: #ffffff;
+          --text-sub: #a0aec0;
+          --hit-color: #26a69a;      
+          --stand-color: #ef5350;    
+          --double-color: #ffa726;   
+          --split-color: #29b6f6;    
+          --surrender-color: #78909c;
+        }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background-color: var(--bg-main);
+          color: var(--text-main);
+          margin: 0;
+          padding: 15px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .container { width: 100%; max-width: 1100px; }
+        .control-panel {
+          background: var(--bg-card);
+          padding: 8px 12px;
+          border-radius: 8px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-start;
+          align-items: center;
+          margin-bottom: 15px;
+          gap: 10px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+          font-size: 0.82rem;
+        }
+        .tc-control { display: flex; align-items: center; gap: 6px; }
+        .tc-control label { font-size: 0.85rem; font-weight: bold; }
+        .tc-control input[type="number"] {
+          width: 65px; padding: 3px 6px; font-size: 0.95rem; font-weight: bold;
+          border-radius: 4px; border: 1px solid #4a5568; background: #0f172a; color: #38bdf8; text-align: center;
+          outline: none;
+        }
+        .insurance-alert { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; background: #374151; color: #9ca3af; }
+        .insurance-alert.active { background: #f59e0b; color: #000; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .sync-badge { font-size: 0.72rem; color: #38d9a9; font-weight: bold; background: #0d2b22; padding: 3px 6px; border-radius: 4px; border: 1px solid #009647; }
+        .plat-badge { font-size: 0.72rem; color: #38bdf8; font-weight: bold; background: #0f2942; padding: 3px 6px; border-radius: 4px; border: 1px solid #0284c7; }
+        
+        .tables-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .tables-grid { grid-template-columns: 1fr; } }
+        .table-section { background: var(--bg-card); padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .table-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #f39c12; border-bottom: 2px solid #334155; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.82rem; }
+        th, td { border: 1px solid #2d3748; padding: 5px 2px; font-weight: bold; }
+        th { background-color: #1a202c; color: #cbd5e1; }
+        .act-H { background-color: var(--hit-color); color: #fff; }
+        .act-S { background-color: var(--stand-color); color: #fff; }
+        .act-D { background-color: var(--double-color); color: #000; }
+        .act-P { background-color: var(--split-color); color: #000; }
+        .act-Rh { background-color: var(--surrender-color); color: #fff; }
+        .is-deviation { outline: 2px solid #ffffff; outline-offset: -2px; position: relative; }
+        .dev-hint { display: block; font-size: 0.58rem; line-height: 1.05; opacity: 0.95; }
+      </style>
+    </head>
+    <body>
+    <div class="container">
+      <div class="control-panel">
+        <div class="tc-control">
+          <label for="tcInput">當前真數 (TC):</label>
+          <input type="number" id="tcInput" value="${currentTC}" step="0.1" readonly>
+        </div>
+        <div id="insuranceAlert" class="insurance-alert">保險策略：不安置 (TC &lt; +3)</div>
+        <span id="platBadge" class="plat-badge">${initPlat === 'SA' ? 'SA 模式 (僅15/16對9可投)' : 'DB 模式 (無投降)'}</span>
+        <span class="sync-badge">⚡ 專屬連動中 (${safeTableTag})</span>
+      </div>
+      <div class="tables-grid">
+        <div class="table-section">
+          <div class="table-title">硬點 (Hard Totals)</div>
+          <table id="hardTable"></table>
+        </div>
+        <div>
+          <div class="table-section" style="margin-bottom: 20px;">
+            <div class="table-title">軟點 (Soft Totals)</div>
+            <table id="softTable"></table>
+          </div>
+          <div class="table-section">
+            <div class="table-title">分牌 (Pair Splits)</div>
+            <table id="pairTable"></table>
+          </div>
+        </div>
+      </div>
+    </div>` + scrOpen + `
+      let currentPlatform = "${initPlat}";
+      const strategyChannel = new BroadcastChannel("${STRATEGY_CHANNEL_NAME}");
+      strategyChannel.onmessage = (event) => {
+        if (event.data && event.data.type === "TC_UPDATE") {
+          document.getElementById('tcInput').value = parseFloat(event.data.tc).toFixed(1);
+          if (event.data.platform) {
+            currentPlatform = event.data.platform;
+            const pb = document.getElementById('platBadge');
+            if (pb) pb.innerText = currentPlatform === 'SA' ? 'SA 模式 (僅15/16對9可投)' : 'DB 模式 (無投降)';
+          }
+          updateTable();
+        }
+      };
+
+      const dealers = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
+      
+      const basicHard = {
+        '8':   ['H','H','H','H','H','H','H','H','H','H'],
+        '9':   ['H','D','D','D','D','H','H','H','H','H'],
+        '10':  ['D','D','D','D','D','D','D','D','H','H'],
+        '11':  ['D','D','D','D','D','D','D','D','D','H'],
+        '12':  ['H','H','S','S','S','H','H','H','H','H'],
+        '13':  ['S','S','S','S','S','H','H','H','H','H'],
+        '14':  ['S','S','S','S','S','H','H','H','H','H'],
+        '15':  ['S','S','S','S','S','H','H','H','H','H'],
+        '16':  ['S','S','S','S','S','H','H','Rh','H','H'],
+        '17+': ['S','S','S','S','S','S','S','S','S','S']
+      };
+
+      const basicSoft = {
+        'A2': ['H','H','H','D','D','H','H','H','H','H'],
+        'A3': ['H','H','H','D','D','H','H','H','H','H'],
+        'A4': ['H','H','D','D','D','H','H','H','H','H'],
+        'A5': ['H','H','D','D','D','H','H','H','H','H'],
+        'A6': ['H','D','D','D','D','H','H','H','H','H'],
+        'A7': ['S','D','D','D','D','S','S','H','H','H'],
+        'A8': ['S','S','S','S','S','S','S','S','S','S'],
+        'A9': ['S','S','S','S','S','S','S','S','S','S']
+      };
+
+      const basicPair = {
+        '2,2':  ['P','P','P','P','P','P','H','H','H','H'],
+        '3,3':  ['P','P','P','P','P','P','H','H','H','H'],
+        '4,4':  ['H','H','H','P','P','H','H','H','H','H'],
+        '5,5':  ['D','D','D','D','D','D','D','D','H','H'],
+        '6,6':  ['P','P','P','P','P','H','H','H','H','H'],
+        '7,7':  ['P','P','P','P','P','P','H','H','H','H'],
+        '8,8':  ['P','P','P','P','P','P','P','P','P','P'],
+        '9,9':  ['P','P','P','P','P','S','P','P','S','S'],
+        '10,10':['S','S','S','S','S','S','S','S','S','S'],
+        'AA':   ['P','P','P','P','P','P','P','P','P','P']
+      };
+
+      const deviations = [
+        { table: 'hard', player: '15', dealer: '9',  minTC: 2,  action: 'Rh', hint: '≥+2', onlySA: true },
+        { table: 'hard', player: '16', dealer: '10', minTC: 0,  action: 'S',  hint: '≥0' },
+        { table: 'hard', player: '16', dealer: 'A',  minTC: 3,  action: 'S',  hint: '≥+3' },
+        { table: 'hard', player: '16', dealer: '9',  minTC: 5,  action: 'S',  hint: '≥+5' },
+        { table: 'hard', player: '15', dealer: '10', minTC: 4,  action: 'S',  hint: '≥+4' },
+        { table: 'hard', player: '15', dealer: 'A',  minTC: 5,  action: 'S',  hint: '≥+5' },
+        { table: 'hard', player: '12', dealer: '3',  minTC: 2,  action: 'S',  hint: '≥+2' },
+        { table: 'hard', player: '12', dealer: '2',  minTC: 3,  action: 'S',  hint: '≥+3' },
+        { table: 'hard', player: '10', dealer: '10', minTC: 4,  action: 'D',  hint: '≥+4' },
+        { table: 'hard', player: '10', dealer: 'A',  minTC: 4,  action: 'D',  hint: '≥+4' },
+        { table: 'hard', player: '11', dealer: 'A',  minTC: 1,  action: 'D',  hint: '≥+1' },
+        { table: 'hard', player: '9',  dealer: '2',  minTC: 1,  action: 'D',  hint: '≥+1' },
+        { table: 'hard', player: '9',  dealer: '7',  minTC: 3,  action: 'D',  hint: '≥+3' },
+        { table: 'hard', player: '8',  dealer: '6',  minTC: 2,  action: 'D',  hint: '≥+2' },
+        { table: 'soft', player: 'A8', dealer: '6',  minTC: 1,  action: 'D',  hint: '≥+1' },
+        { table: 'soft', player: 'A8', dealer: '5',  minTC: 1,  action: 'D',  hint: '≥+1' },
+        { table: 'soft', player: 'A6', dealer: '2',  minTC: 1,  action: 'D',  hint: '≥+1' },
+        { table: 'hard', player: '12', dealer: '4',  maxTC: -0.1, action: 'H', hint: '<0' },
+        { table: 'hard', player: '13', dealer: '2',  maxTC: -1,   action: 'H', hint: '≤-1' },
+        { table: 'hard', player: '13', dealer: '3',  maxTC: -2,   action: 'H', hint: '≤-2' }
+      ];
+      const actionText = { 'H': '要', 'S': '停', 'D': '倍', 'P': '分', 'Rh': '投' };
+
+      function buildTableHTML(tableId, dataObject, tableName) {
+        let html = '<thead><tr><th>手牌</th>';
+        dealers.forEach(d => html += '<th>' + d + '</th>');
+        html += '</tr></thead><tbody>';
+        const currentTC = parseFloat(document.getElementById('tcInput').value) || 0;
+
+        for (let player in dataObject) {
+          html += '<tr><td>' + player + '</td>';
+          dealers.forEach((dealer, idx) => {
+            let baseAction = dataObject[player][idx];
+            if (baseAction === 'Rh' && currentPlatform !== 'SA') {
+              baseAction = 'H';
+            }
+            let currentAction = baseAction;
+            let isDev = false;
+            let devHint = '';
+
+            deviations.forEach(dev => {
+              if (dev.table === tableName && dev.player === player && dev.dealer === dealer) {
+                if (dev.onlySA && currentPlatform !== 'SA') return;
+                if (dev.minTC !== undefined && currentTC >= dev.minTC) {
+                  currentAction = dev.action;
+                  isDev = true;
+                  devHint = dev.hint || '';
+                }
+                if (dev.maxTC !== undefined && currentTC <= dev.maxTC) {
+                  currentAction = dev.action;
+                  isDev = true;
+                  devHint = dev.hint || '';
+                }
+              }
+            });
+
+            const devClass = isDev ? 'is-deviation' : '';
+            const hintHtml = (isDev && devHint) ? '<span class="dev-hint">(' + devHint + ')</span>' : '';
+            html += '<td class="act-' + currentAction + ' ' + devClass + '">' + (actionText[currentAction] || currentAction) + hintHtml + '</td>';
+          });
+          html += '</tr>';
+        }
+        html += '</tbody>';
+        document.getElementById(tableId).innerHTML = html;
+      }
+
+      function updateTable() {
+        const currentTC = parseFloat(document.getElementById('tcInput').value) || 0;
+        buildTableHTML('hardTable', basicHard, 'hard');
+        buildTableHTML('softTable', basicSoft, 'soft');
+        buildTableHTML('pairTable', basicPair, 'pair');
+
+        const insAlert = document.getElementById('insuranceAlert');
+        if (currentTC >= 3.0) {
+          insAlert.className = 'insurance-alert active';
+          insAlert.innerHTML = '★ 買保險！ (TC &ge; +3)';
+        } else {
+          insAlert.className = 'insurance-alert';
+          insAlert.innerHTML = '保險策略：不安置 (TC &lt; +3)';
+        }
+      }
+      updateTable();
+    ` + scrClose + `
+    </body>
+    </html>`;
+
+    newWindow.document.write(htmlContent); 
+    newWindow.document.close();
+  }
+
+  function switchMode(mode) {
+    triggerVibrate();
+    currentMode = mode;
+    let tabShoe = document.getElementById("tabShoe");
+    let tabDealer = document.getElementById("tabDealer");
+    let historyTitleText = document.getElementById("historyTitleText");
+    let bodyEl = document.body;
+
+    if (mode === 'shoe') {
+      tabShoe.className = "mode-tab shoe-active"; tabDealer.className = "mode-tab";
+      bodyEl.classList.add("shoe-mode-locked"); bodyEl.classList.remove("dealer-mode-locked");
+      historyTitleText.innerText = "📜 記錄牌局(點藍牌修改)"; 
+      updateLastTapBanner("已切換：閒家輸入模式", "player");
+    } else {
+      tabShoe.className = "mode-tab"; tabDealer.className = "mode-tab dealer-active";
+      bodyEl.classList.remove("shoe-mode-locked"); bodyEl.classList.add("dealer-mode-locked");
+      historyTitleText.innerText = "📜 記錄牌局(點紅牌修改)"; 
+      updateLastTapBanner("已切換：莊家輸入模式", "dealer");
+    }
+    updateDealerDisplay(); updateUI(false, true);
+  }
+
+  function handlePadClick(val, btnEl) {
+    triggerVibrate();
+    let isDealer = (currentMode === 'dealer');
+    triggerBtnFlash(btnEl, isDealer ? 'dealer' : 'player');
+
+    let label = val === 1 ? "A" : (val === 10 ? "10" : val.toString());
+    recordCard(val, isDealer);
+
+    if (isDealer) {
+      currentDealerCards.push({ val: val, label: label });
+      updateDealerDisplay();
+      updateLastTapBanner(`莊家 +${label}（第 ${historyStack.length} 張）`, 'dealer');
+      saveGameState(true);
+    } else {
+      updateLastTapBanner(`閒家 +${label}（第 ${historyStack.length} 張）`, 'player');
+    }
+  }
+
+  function handleBurnClick(btnEl) {
+    triggerVibrate();
+    if (currentMode === 'shoe') {
+      triggerBtnFlash(btnEl, 'burn');
+      recordBurnCard();
+      updateLastTapBanner(`Ø 銷牌（第 ${historyStack.length} 張）`, 'burn');
+    } else {
+      alert("⚠️ 目前為莊家模式，銷牌請先切回「閒家」模式！");
+    }
+  }
+
+  function recordCard(val, isDealer = false) {
+    let totalCards = config.decks * 52;
+    if (historyStack.length >= totalCards) return;
+    let weight = (val >= 2 && val <= 6) ? 1 : ((val >= 7 && val <= 9) ? 0 : -1);
+    let label = val === 1 ? "A" : (val === 10 ? "10" : val.toString());
+    historyStack.push({ weight: weight, label: label, value: val, isBurn: false, isDealer: isDealer });
+    saveGameState(); updateUI(true, false);
+  }
+
+  function recordBurnCard() {
+    let totalCards = config.decks * 52;
+    if (historyStack.length >= totalCards) return;
+    historyStack.push({ weight: 0, label: "Ø", isBurn: true, isDealer: false, count: 1 });
+    saveGameState(); updateUI(true, false);
+  }
+
+  function removeDealerCardAt(index) {
+    triggerVibrate();
+    if (currentMode === 'shoe') return;
+    if (index >= 0 && index < currentDealerCards.length) {
+      let removedCard = currentDealerCards[index];
+      currentDealerCards.splice(index, 1);
+      let removedFromStack = false;
+      for (let i = historyStack.length - 1; i >= 0; i--) {
+        if (!historyStack[i].isBurn && historyStack[i].isDealer && historyStack[i].value === removedCard.val) {
+          historyStack.splice(i, 1);
+          removedFromStack = true;
+          break;
+        }
+      }
+      if (!removedFromStack) {
+        for (let i = historyStack.length - 1; i >= 0; i--) {
+          if (!historyStack[i].isBurn && historyStack[i].value === removedCard.val) { historyStack.splice(i, 1); break; }
+        }
+      }
+      let auditMsg = `刪除了莊家手牌 [${removedCard.label}]`;
+      updateLastTapBanner(`🗑️ 已刪莊家手牌 [${removedCard.label}]`, 'dealer');
+      saveGameState(true, auditMsg); updateDealerDisplay(); updateUI(false, true);
+    }
+  }
+
+  function nextDealerRound() {
+    triggerVibrate();
+    if (currentDealerCards.length === 0) return;
+    let sum = getDealerHandSum(currentDealerCards);
+    if (sum < 17 && !confirm(`⚠️ 目前莊家點數為 ${sum} 點（未滿 17 點）。確定要直接結算並進入下一局嗎？`)) return;
+    
+    dealerHistoryRounds.unshift({ cards: [...currentDealerCards], sum: sum });
+    if (dealerHistoryRounds.length > 100) dealerHistoryRounds.pop();
+    
+    currentDealerCards = [];
+    updateLastTapBanner(`✅ 已結算莊家局 (Pts: ${sum})`, 'dealer');
+    saveGameState(true); updateDealerDisplay(); updateUI(false, true);
+  }
+
+  function getDealerHandSum(cards) {
+    let sum = 0, ace = 0;
+    for (let c of cards) { if (c.val === 1) { ace++; sum += 11; } else { sum += c.val; } }
+    while (sum > 21 && ace > 0) { sum -= 10; ace--; }
+    return sum;
+  }
+
+  function updateDealerDisplay() {
+    let container = document.getElementById("dealerCurrentCards"), badge = document.getElementById("dealerSumBadge");
+    let alertBadge = document.getElementById("dealerAlertBadge");
+
+    if (currentDealerCards.length === 0) {
+      container.innerHTML = '<span style="font-size: 0.68rem; color:var(--text-sub);">請切換「莊家」模式記錄...</span>'; badge.innerText = "Pts: 0";
+      badge.style.color = "#FECDD3";
+    } else {
+      let sum = getDealerHandSum(currentDealerCards);
+      badge.innerText = `Pts: ${sum}` + (sum > 21 ? " (爆牌)" : "");
+      badge.style.color = sum > 21 ? "var(--accent-red)" : "#FECDD3";
+      container.innerHTML = currentDealerCards.map((c, idx) => `<div class="dealer-card-chip" onclick="removeDealerCardAt(${idx})" title="點擊刪除">${c.label}</div>`).join("");
+    }
+
+    if (alertBadge) {
+      let recentRounds = dealerHistoryRounds.slice(0, 3);
+      let recentSmallCount = 0;
+      let multiCardRounds = 0;
+
+      recentRounds.forEach(r => {
+        if (r.cards.length >= 4) multiCardRounds++;
+        r.cards.forEach(c => {
+          if (c.val >= 2 && c.val <= 6) recentSmallCount++;
+        });
+      });
+
+      let currentSmallCount = currentDealerCards.filter(c => c.val >= 2 && c.val <= 6).length;
+
+      if (multiCardRounds >= 2 || recentSmallCount >= 8) {
+        alertBadge.innerHTML = '🚨 <span style="color:var(--accent-red); background:#3B1214; padding:1px 4px; border-radius:3px; border:1px solid var(--accent-red);">莊家小牌過密!</span>';
+      } else if (currentSmallCount >= 3) {
+        alertBadge.innerHTML = '⚠️ <span style="color:var(--accent-yellow); background:#2B200A; padding:1px 4px; border-radius:3px; border:1px solid var(--accent-yellow);">當局多張小牌</span>';
+      } else {
+        alertBadge.innerHTML = '';
+      }
+    }
+    
+    let historyContainer = document.getElementById("dealerHistoryList");
+    let totalRounds = dealerHistoryRounds.length;
+
+    if (totalRounds === 0) {
+      historyContainer.innerHTML = '<div style="font-size: 0.68rem; color:var(--text-sub); text-align:center; padding: 2px;">尚無過往紀錄</div>';
+    } else {
+      historyContainer.innerHTML = dealerHistoryRounds.map((r, rIdx) => {
+        let displayRoundNum = totalRounds - rIdx;
+        return `
+          <div class="dealer-history-row">
+            <span class="dh-round">RND ${String(displayRoundNum).padStart(2, '0')}</span>
+            <div class="dh-cards">${r.cards.map((c, cIdx) => `<span class="dh-tag" onclick="openDealerCardModal(${rIdx}, ${cIdx}, this)" title="點擊修改這張莊家牌">${c.label}</span>`).join("")}</div>
+            <span class="dh-pts-badge" style="color:${r.sum > 21 ? 'var(--accent-red)' : '#FECDD3'};">Pts: ${r.sum}</span>
+          </div>`;
+      }).join("");
+    }
+  }
+
+  function resetShoe() {
+    triggerVibrate();
+    if (confirm("確認換靴洗牌？此分頁的計數數據與紀錄將完全清空！")) {
+      let prevCount = historyStack.length;
+      savePreShuffleSnapshot();
+      historyStack = []; 
+      currentDealerCards = []; 
+      dealerHistoryRounds = []; 
+      localStorage.removeItem(STATE_STORAGE_KEY);
+      let auditMsg = prevCount > 0 ? `按下了「🔄 洗牌」（清空 ${prevCount} 張）` : "按下了「🔄 洗牌」";
+      updateLastTapBanner("🔄 已換靴洗牌（0 張）", "");
+      saveGameState(true, auditMsg); 
+      updateDealerDisplay(); 
+      updateUI(false, true);
+    }
+  }
+
+  function undoResetShoe() {
+    triggerVibrate();
+    if (!lastShoeSnapshot) {
+      alert("⚠️ 目前沒有可復原的洗牌備份（超過 15 秒或尚未洗牌）！");
+      return;
+    }
+    historyStack = lastShoeSnapshot.historyStack || [];
+    currentDealerCards = lastShoeSnapshot.currentDealerCards || [];
+    dealerHistoryRounds = lastShoeSnapshot.dealerHistoryRounds || [];
+    if (lastShoeSnapshot.config) {
+      config.bankroll = lastShoeSnapshot.config.bankroll || 0;
+      config.rebate = lastShoeSnapshot.config.rebate || 0;
+      config.baseEV = lastShoeSnapshot.config.baseEV !== undefined ? lastShoeSnapshot.config.baseEV : -0.53;
+      config.tableRoomId = lastShoeSnapshot.config.tableRoomId || "Ｄ廳";
+      config.platform = lastShoeSnapshot.config.platform || "SA";
+    }
+    lastShoeSnapshot = null;
+    if (shoeBackupTimer) {
+      clearTimeout(shoeBackupTimer);
+      shoeBackupTimer = null;
+    }
+    let rescuedCount = historyStack.length;
+    let auditMsg = `復原了洗牌（救回 ${rescuedCount} 張）`;
+    updateLastTapBanner(`✅ 已復原洗牌（救回 ${rescuedCount} 張）`, "player");
+    saveGameState(true, auditMsg);
+    updateDealerDisplay();
+    updateUI(false, true);
+  }
+
+  function applyConfig() {
+    let bVal = document.getElementById("cfgBankroll").value.trim();
+    let bInput = parseFloat(bVal);
+    let newBankroll = (isNaN(bInput) || bInput <= 0) ? 0 : bInput;
+    
+    let rVal = document.getElementById("cfgRebate").value.trim();
+    let rInput = parseFloat(rVal);
+    let newRebate = isNaN(rInput) ? 0 : rInput;
+
+    let evVal = document.getElementById("cfgBaseEV").value.trim();
+    let evInput = parseFloat(evVal);
+    let newBaseEV = isNaN(evInput) ? (config.platform === 'SA' ? -0.53 : -0.68) : evInput;
+
+    let selectedRoom = document.getElementById("cfgTableRoomId").value;
+    let newRoom = VALID_ROOMS.includes(selectedRoom) ? selectedRoom : "Ｄ廳";
+
+    let auditMsg = "";
+    if (config.tableRoomId !== newRoom) auditMsg = `切換廳別為 ${newRoom}`;
+    else if (config.bankroll !== newBankroll || config.rebate !== newRebate) auditMsg = "修改了本金/返水設定";
+
+    config.bankroll = newBankroll;
+    config.rebate = newRebate;
+    config.baseEV = newBaseEV;
+    config.tableRoomId = newRoom;
+
+    saveGameState(!!auditMsg, auditMsg); updateUI(false, true);
+  }
+
+  function createCardCellNode(item, index, totalStack) {
+    let distFromEnd = totalStack - 1 - index;
+    let cell = document.createElement("div");
+    let cellClass = "history-cell";
+    if (item.isBurn) {
+      cellClass += " burn-cell";
+    } else if (item.isDealer) {
+      cellClass += " dealer-cell";
+    }
+    if (distFromEnd === 0) {
+      cellClass += " newest-ring";
+    }
+
+    cell.className = cellClass;
+    cell.onclick = () => openHistoryCardModal(index);
+    cell.title = item.isDealer ? "莊家牌 (切至莊家模式點擊修改/刪除)" : "閒家牌 (切至閒家模式點擊修改/刪除)";
+    cell.innerHTML = `${item.label}<span class="card-idx-tag">${index + 1}</span>`;
+    return cell;
+  }
+
+  function updateUI(isNewCardAdded = false, fullRebuild = false) {
+    let totalCards = config.decks * 52;
+    let dealtCards = 0, runningCount = 0;
+    let counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0};
+    let totalPerVal = config.decks * 4;
+
+    for (let item of historyStack) {
+      if (item.isBurn) { dealtCards += item.count; } 
+      else { dealtCards += 1; runningCount += item.weight; if (item.value) counts[item.value] = (counts[item.value] || 0) + 1; }
+    }
+
+    for (let v = 1; v <= 10; v++) {
+      let maxCount = (v === 10) ? (config.decks * 16) : totalPerVal;
+      let rem = Math.max(0, maxCount - (counts[v] || 0));
+      let el = document.getElementById(`rem-${v}`);
+      if (el) el.innerText = `剩 ${rem}`;
+    }
+
+    let remCards = Math.max(0, totalCards - dealtCards);
+    let remDecks = Math.max(0.5, (remCards / 52.0));
+    let trueCount = runningCount / remDecks;
+
+    strategySyncChannel.postMessage({ type: "TC_UPDATE", tc: trueCount, platform: config.platform });
+
+    let penetration = Math.min(100, Math.round((dealtCards / totalCards) * 100));
+    document.getElementById("txtPenetration").innerText = `${penetration}%`;
+    document.getElementById("txtDealtCards").innerText = dealtCards;
+    document.getElementById("txtTotalCards").innerText = totalCards;
+    document.getElementById("shoeProgressFill").style.width = `${penetration}%`;
+
+    let tcRcEl = document.getElementById("valTC_RC");
+    tcRcEl.innerText = `${trueCount >= 0 ? '+' : ''}${trueCount.toFixed(1)} (RC: ${runningCount})`;
+
+    let cardEV = trueCount * 0.65; 
+    let baseEV = config.baseEV !== undefined ? config.baseEV : (config.platform === 'SA' ? -0.53 : -0.68);
+    let rebateVal = config.rebate || 0;
+    let totalEV = cardEV + baseEV + rebateVal; 
+
+    let cardEvEl = document.getElementById("valEV_Card");
+    cardEvEl.innerText = `${cardEV >= 0 ? '+' : ''}${cardEV.toFixed(2)}%`;
+
+    let baseEvEl = document.getElementById("valEV_Base");
+    baseEvEl.innerText = `${baseEV >= 0 ? '+' : ''}${baseEV.toFixed(2)}%`;
+
+    let rebateEvEl = document.getElementById("valEV_Rebate");
+    rebateEvEl.innerText = `+${rebateVal.toFixed(2)}%`;
+
+    let totalEvEl = document.getElementById("valEV_Total");
+    totalEvEl.innerText = `${totalEV >= 0 ? '+' : ''}${totalEV.toFixed(2)}%`;
+    totalEvEl.style.color = totalEV > 0 ? "var(--accent-green)" : (totalEV < -0.5 ? "var(--accent-red)" : "var(--accent-blue)");
+
+    let recBet = 0;
+    let bankroll = config.bankroll;
+    let betMainEl = document.getElementById("valBetMain");
+
+    if (bankroll <= 0) {
+      betMainEl.innerHTML = '$0.00 <span style="font-size:0.6rem; color:var(--accent-red);">(請輸入本金)</span>';
+    } else {
+      if (totalEV > 0) {
+        recBet = bankroll * (totalEV / 100.0);
+      } else {
+        recBet = 0;
+      }
+      betMainEl.innerText = `$${recBet.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+
+    let histContainer = document.getElementById("historyGrid");
+    let totalStack = historyStack.length;
+
+    if (totalStack === 0) {
+      histContainer.innerHTML = '<div class="history-cell empty" style="grid-column: span 7; text-align:center;">尚無記錄</div>';
+    } else {
+      let emptyChild = histContainer.querySelector('.history-cell.empty');
+      if (emptyChild) histContainer.removeChild(emptyChild);
+
+      if (isNewCardAdded && !fullRebuild && histContainer.children.length === totalStack - 1) {
+        let prevNewest = histContainer.firstChild;
+        if (prevNewest && prevNewest.classList) {
+          prevNewest.classList.remove("newest-ring");
+        }
+
+        let lastIdx = totalStack - 1;
+        let newCellNode = createCardCellNode(historyStack[lastIdx], lastIdx, totalStack);
+        histContainer.insertBefore(newCellNode, histContainer.firstChild);
+      } else {
+        histContainer.innerHTML = "";
+        let frag = document.createDocumentFragment();
+        for (let i = totalStack - 1; i >= 0; i--) {
+          frag.appendChild(createCardCellNode(historyStack[i], i, totalStack));
+        }
+        histContainer.appendChild(frag);
+      }
+
+      histContainer.scrollTop = 0;
+    }
+  }
+
+  // 🔥 全域函數保護：確保即使使用 VM 虛擬機混淆加密，所有按鈕點擊與輸入事件依然 100% 正常運作
+  window.checkPassword = checkPassword;
+  window.toggleMasterCodesPanel = toggleMasterCodesPanel;
+  window.toggleLayout = toggleLayout;
+  window.toggleTheme = toggleTheme;
+  window.toggleSyncPanel = toggleSyncPanel;
+  window.openMatrixNewTab = openMatrixNewTab;
+  window.createRoom = createRoom;
+  window.joinRoom = joinRoom;
+  window.forceSyncNow = forceSyncNow;
+  window.generateNextBatch = generateNextBatch;
+  window.copyTempCode = copyTempCode;
+  window.toggleCodeRevoked = toggleCodeRevoked;
+  window.setTempNickname = setTempNickname;
+  window.kickUser = kickUser;
+  window.setPlatform = setPlatform;
+  window.applyConfig = applyConfig;
+  window.openEvModal = openEvModal;
+  window.closeEvModal = closeEvModal;
+  window.selectEvValue = selectEvValue;
+  window.applyCustomEv = applyCustomEv;
+  window.switchMode = switchMode;
+  window.handlePadClick = handlePadClick;
+  window.handleBurnClick = handleBurnClick;
+  window.resetShoe = resetShoe;
+  window.undoResetShoe = undoResetShoe;
+  window.dismissTamperAlert = dismissTamperAlert;
+  window.openHistoryCardModal = openHistoryCardModal;
+  window.closeHistoryCardModal = closeHistoryCardModal;
+  window.applyHistoryCardReplacement = applyHistoryCardReplacement;
+  window.deleteHistoryCard = deleteHistoryCard;
+  window.nextDealerRound = nextDealerRound;
+  window.removeDealerCardAt = removeDealerCardAt;
+  window.openDealerCardModal = openDealerCardModal;
+  window.closeDealerCardModal = closeDealerCardModal;
+  window.applyDealerCardReplacement = applyDealerCardReplacement;
+  window.deleteDealerHistoryCard = deleteDealerHistoryCard;
+})();
+</script>
+
+</body>
+</html>
